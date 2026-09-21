@@ -270,6 +270,8 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
     if (!canvas) return null;
 
     const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+
     let clientX = 0;
     let clientY = 0;
 
@@ -290,13 +292,34 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
       clientY = e.clientY;
     }
 
-    const scaleX = LOGICAL_WIDTH / rect.width;
-    const scaleY = LOGICAL_HEIGHT / rect.height;
+    // Determine actual rendered content box inside canvas (handles any aspect-ratio letterboxing or scaling)
+    const intrinsicRatio = LOGICAL_WIDTH / LOGICAL_HEIGHT; // 800 / 500 = 1.6
+    const elemRatio = rect.width / rect.height;
 
-    return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top) * scaleY,
-    };
+    let contentWidth = rect.width;
+    let contentHeight = rect.height;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    if (elemRatio > intrinsicRatio + 0.001) {
+      // Element is wider than 16:10 -> pillarboxing (bars on left and right)
+      contentHeight = rect.height;
+      contentWidth = contentHeight * intrinsicRatio;
+      offsetX = (rect.width - contentWidth) / 2;
+    } else if (elemRatio < intrinsicRatio - 0.001) {
+      // Element is taller than 16:10 -> letterboxing (bars on top and bottom)
+      contentWidth = rect.width;
+      contentHeight = contentWidth / intrinsicRatio;
+      offsetY = (rect.height - contentHeight) / 2;
+    }
+
+    const relativeX = clientX - (rect.left + offsetX);
+    const relativeY = clientY - (rect.top + offsetY);
+
+    const x = Math.max(0, Math.min(LOGICAL_WIDTH, (relativeX / contentWidth) * LOGICAL_WIDTH));
+    const y = Math.max(0, Math.min(LOGICAL_HEIGHT, (relativeY / contentHeight) * LOGICAL_HEIGHT));
+
+    return { x, y };
   };
 
   const handlePointerDown = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -462,6 +485,27 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isDrawer, undoStack]);
+
+  useEffect(() => {
+    const handleGlobalPointerUp = () => {
+      if (isDrawing.current && currentStroke.current) {
+        const stroke = currentStroke.current;
+        isDrawing.current = false;
+        currentStroke.current = null;
+        onBroadcastDraw({
+          type: 'stroke',
+          stroke,
+        });
+      }
+    };
+
+    window.addEventListener('mouseup', handleGlobalPointerUp);
+    window.addEventListener('touchend', handleGlobalPointerUp);
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalPointerUp);
+      window.removeEventListener('touchend', handleGlobalPointerUp);
+    };
+  }, [onBroadcastDraw]);
 
   const toolbarContent = isDrawer ? (
     <div className="canvas-toolbar">
@@ -658,7 +702,7 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
           style={{
             width: '100%',
             height: '100%',
-            objectFit: 'contain',
+            display: 'block',
             cursor: !isDrawer
               ? 'default'
               : tool === 'bucket'
@@ -689,6 +733,7 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
               gap: '6px',
               border: isLoneGuesser && mode === 'all_draw' ? '1px solid var(--accent-cyan)' : '1px solid rgba(255, 216, 117, 0.3)',
               boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
+              pointerEvents: 'none',
             }}
             className="font-cinzel"
           >
@@ -717,6 +762,7 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
               gap: '6px',
               border: '1px solid var(--hogwarts-gold)',
               boxShadow: '0 0 10px rgba(255, 216, 117, 0.4)',
+              pointerEvents: 'none',
             }}
             className="font-cinzel"
           >
@@ -740,6 +786,7 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
               gap: '6px',
               border: '1px solid var(--accent-cyan)',
               boxShadow: '0 0 10px rgba(56, 189, 248, 0.4)',
+              pointerEvents: 'none',
             }}
             className="font-cinzel"
           >
