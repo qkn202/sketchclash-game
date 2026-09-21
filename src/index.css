@@ -1,0 +1,750 @@
+:root {
+  /* Hogwarts Magical Theme Tokens */
+  --bg-main: #06040a;
+  --bg-card: #0f091a;
+  --bg-card-hover: #19102b;
+  --bg-stage: #090610;
+  --bg-toolbar: #140d24;
+  --border-card: rgba(200, 170, 110, 0.28);
+  --border-gold-glow: rgba(255, 216, 117, 0.6);
+
+  /* Hogwarts 4 Houses & Magic Colors */
+  --hogwarts-gold: #ffd875;
+  --hogwarts-gold-dark: #c8aa6e;
+  --hogwarts-gold-brass: #8f6e2f;
+
+  --house-gryffindor: #9b111e;
+  --house-gryffindor-light: #d63031;
+  --house-slytherin: #1a472a;
+  --house-slytherin-light: #2ecc71;
+  --house-ravenclaw: #0e1a40;
+  --house-ravenclaw-light: #38bdf8;
+  --house-hufflepuff: #d3a625;
+  --house-hufflepuff-light: #fef08a;
+
+  --accent-blue: #38bdf8;
+  --accent-cyan: #2dd4bf;
+  --accent-yellow: #ffd875;
+  --accent-red: #f43f5e;
+  --accent-purple: #c084fc;
+
+  --text-main: #f5eedc;
+  --text-muted: #a39bb3;
+  --text-dark: #120902;
+
+  --btn-shadow: 0 4px 0 rgba(0, 0, 0, 0.6);
+  --card-shadow: 0 16px 36px -6px rgba(0, 0, 0, 0.8), 0 0 20px rgba(200, 170, 110, 0.08);
+
+  --font-title: 'Cinzel Decorative', 'Playfair Display', serif;
+  --font-heading: 'Playfair Display', 'Cormorant Garamond', 'Cinzel', serif;
+  --font-body: 'Outfit', 'Fredoka', 'Plus Jakarta Sans', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  width: 100%;
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  scroll-behavior: smooth;
+}
+
+body {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg-main);
+  background-image: 
+    radial-gradient(ellipse at 50% -10%, rgba(155, 17, 30, 0.22) 0%, transparent 60%),
+    radial-gradient(ellipse at 88% 85%, rgba(26, 71, 42, 0.18) 0%, transparent 55%),
+    radial-gradient(ellipse at 12% 85%, rgba(14, 26, 64, 0.22) 0%, transparent 55%),
+    radial-gradient(circle at 50% 40%, rgba(200, 170, 110, 0.06) 0%, transparent 65%),
+    radial-gradient(rgba(255, 216, 117, 0.07) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 32px 32px;
+  background-attachment: fixed;
+  color: var(--text-main);
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  user-select: none;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
+
+button {
+  font-family: var(--font-heading);
+  cursor: pointer;
+  border: none;
+  outline: none;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  transition: all 0.12s ease-out;
+  touch-action: manipulation;
+}
+
+button:active:not(:disabled) {
+  transform: translateY(3px);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.6);
+}
+
+/* 16px font-size prevents iOS Safari from zooming in on input focus! */
+input, select {
+  font-family: var(--font-body);
+  outline: none;
+  border: 2px solid var(--border-card);
+  background: rgba(10, 6, 18, 0.85);
+  color: #fff;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 16px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  -webkit-appearance: none;
+}
+
+input:focus, select:focus {
+  border-color: var(--hogwarts-gold);
+  box-shadow: 0 0 0 3px rgba(255, 216, 117, 0.25);
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(10, 6, 18, 0.85);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(200, 170, 110, 0.45);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 216, 117, 0.25);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--hogwarts-gold);
+  box-shadow: 0 0 10px rgba(255, 216, 117, 0.6);
+}
+
+/* Hogwarts Gold Font Title */
+.font-cinzel {
+  font-family: var(--font-heading);
+}
+
+.gold-title {
+  font-family: var(--font-title);
+  background: linear-gradient(135deg, #fff7d6 0%, #ffd875 40%, #c8aa6e 80%, #9e7d3b 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 2px 10px rgba(255, 216, 117, 0.2);
+}
+
+/* Magical 3D Buttons */
+.btn-primary, .btn-gold {
+  background: linear-gradient(180deg, #ffe18d 0%, #d4af37 60%, #a88424 100%);
+  color: #261601;
+  border-bottom: 4px solid #634706;
+  border-radius: 14px;
+  box-shadow: var(--btn-shadow);
+  padding: 12px 20px;
+  min-height: 44px;
+  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.btn-primary:hover:not(:disabled), .btn-gold:hover:not(:disabled) {
+  background: linear-gradient(180deg, #fff0b3 0%, #e6c34e 60%, #c29b2b 100%);
+  box-shadow: 0 0 15px rgba(255, 216, 117, 0.4), var(--btn-shadow);
+}
+.btn-primary:active:not(:disabled), .btn-gold:active:not(:disabled) {
+  border-bottom-width: 1px;
+}
+
+.btn-secondary, .btn-gryffindor {
+  background: linear-gradient(180deg, #b81d24 0%, #740001 100%);
+  color: #fff2cc;
+  border-bottom: 4px solid #4a0000;
+  border-radius: 14px;
+  box-shadow: var(--btn-shadow);
+  padding: 12px 20px;
+  min-height: 44px;
+  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn-secondary:hover:not(:disabled), .btn-gryffindor:hover:not(:disabled) {
+  background: linear-gradient(180deg, #d42a32 0%, #8b0002 100%);
+  box-shadow: 0 0 15px rgba(184, 29, 36, 0.4), var(--btn-shadow);
+}
+.btn-secondary:active:not(:disabled), .btn-gryffindor:active:not(:disabled) {
+  border-bottom-width: 1px;
+}
+
+.btn-yellow, .btn-slytherin {
+  background: linear-gradient(180deg, #2d6a4f 0%, #1a472a 100%);
+  color: #d8f3dc;
+  border-bottom: 4px solid #0f2b19;
+  border-radius: 14px;
+  box-shadow: var(--btn-shadow);
+  padding: 10px 18px;
+  min-height: 44px;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.btn-yellow:hover:not(:disabled), .btn-slytherin:hover:not(:disabled) {
+  background: linear-gradient(180deg, #40916c 0%, #225e37 100%);
+  box-shadow: 0 0 15px rgba(45, 106, 79, 0.4), var(--btn-shadow);
+}
+.btn-yellow:active:not(:disabled), .btn-slytherin:active:not(:disabled) {
+  border-bottom-width: 1px;
+}
+
+.btn-danger {
+  background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%);
+  color: #ffffff;
+  border-bottom: 4px solid #6b1010;
+  border-radius: 12px;
+  box-shadow: var(--btn-shadow);
+  padding: 8px 14px;
+  min-height: 40px;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.btn-danger:hover:not(:disabled) {
+  background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
+}
+.btn-danger:active:not(:disabled) {
+  border-bottom-width: 1px;
+}
+
+.btn-icon {
+  background: var(--bg-card);
+  color: #fff;
+  border: 2px solid var(--border-card);
+  border-bottom: 3px solid rgba(0, 0, 0, 0.6);
+  border-radius: 12px;
+  padding: 8px;
+  min-width: 40px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.btn-icon:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--hogwarts-gold);
+}
+
+/* Magical VFX Brush & Stamp Buttons */
+.btn-tool-fire {
+  background: rgba(45, 15, 10, 0.7);
+  border-color: rgba(255, 69, 0, 0.4);
+}
+.btn-tool-fire:hover {
+  border-color: #ff4500;
+  box-shadow: 0 0 10px rgba(255, 69, 0, 0.5);
+}
+.btn-tool-fire.active {
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%) !important;
+  border-color: #ffd875 !important;
+  box-shadow: 0 0 14px rgba(234, 88, 12, 0.8), inset 0 0 6px rgba(255, 216, 117, 0.5);
+  color: #fff !important;
+}
+
+.btn-tool-ice {
+  background: rgba(10, 30, 45, 0.7);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+.btn-tool-ice:hover {
+  border-color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+}
+.btn-tool-ice.active {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+  border-color: #bae6fd !important;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.8), inset 0 0 6px rgba(224, 242, 254, 0.5);
+  color: #fff !important;
+}
+
+.btn-tool-sparkle {
+  background: rgba(45, 35, 10, 0.7);
+  border-color: rgba(255, 216, 117, 0.4);
+}
+.btn-tool-sparkle:hover {
+  border-color: var(--hogwarts-gold);
+  box-shadow: 0 0 10px rgba(255, 216, 117, 0.5);
+}
+.btn-tool-sparkle.active {
+  background: linear-gradient(135deg, #ffd875 0%, #d4af37 100%) !important;
+  border-color: #ffffff !important;
+  box-shadow: 0 0 14px rgba(255, 216, 117, 0.9), inset 0 0 6px rgba(255, 255, 255, 0.6);
+  color: #261601 !important;
+}
+
+/* Animations */
+@keyframes bounceIn {
+  0% { transform: scale(0.7); opacity: 0; }
+  70% { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 12px rgba(255, 216, 117, 0.4); }
+  50% { box-shadow: 0 0 24px rgba(255, 216, 117, 0.85); }
+}
+
+@keyframes magicalFloat {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-6px) rotate(1deg); }
+}
+
+.animate-bounce-in {
+  animation: bounceIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 1.2s infinite;
+}
+
+.animate-float {
+  animation: magicalFloat 3.5s ease-in-out infinite;
+}
+
+/* Desktop & Tablet Layout Containers */
+.game-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 8px 16px 28px;
+}
+
+/* Waiting Room Full Page Flow */
+.waiting-room-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: clamp(8px, 2vw, 16px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  padding-bottom: 40px;
+}
+
+.waiting-room-launch-card {
+  background: var(--bg-card);
+  border: 2px solid var(--hogwarts-gold);
+  border-radius: 18px;
+  padding: 16px 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7), 0 0 20px rgba(255, 216, 117, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.dock-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dock-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.game-main-grid {
+  display: grid;
+  grid-template-columns: 200px 1fr 290px;
+  gap: 12px;
+  flex: 1;
+  width: 100%;
+  height: calc(100vh - 76px);
+  max-height: calc(100vh - 76px);
+  min-height: 420px;
+}
+
+.right-panel-column {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  gap: 8px;
+  overflow: hidden;
+}
+
+#drawing-toolbar-container {
+  width: 100%;
+  flex-shrink: 0;
+}
+
+#drawing-toolbar-container:empty {
+  display: none;
+}
+
+.lobby-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+/* =========================================================
+   MOBILE RESPONSIVENESS & AUDIT OPTIMIZATIONS (<= 820px)
+   ========================================================= */
+@media (max-width: 1024px) {
+  .game-main-grid {
+    grid-template-columns: 180px 1fr 240px;
+    gap: 10px;
+    min-height: 420px;
+  }
+}
+
+.game-header-bar {
+  background: rgba(15, 9, 26, 0.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: 16px;
+  border: 2px solid var(--border-card);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.75), 0 0 16px rgba(255, 216, 117, 0.12);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 12px;
+  position: sticky;
+  top: 6px;
+  z-index: 100;
+}
+
+.desktop-only-hint {
+  display: flex;
+}
+
+.avatar-selectors-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+@media (max-width: 820px) {
+  .game-container {
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: 6px 8px;
+    overflow-x: hidden;
+  }
+
+  .game-container.in-game-mobile {
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 8px;
+  }
+
+  .game-header-bar {
+    padding: 6px 10px;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .desktop-only-hint {
+    display: none !important;
+  }
+
+  .avatar-selectors-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .lobby-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .game-main-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+  }
+
+  .mobile-hide {
+    display: none !important;
+  }
+
+  .mobile-full-width {
+    width: 100% !important;
+  }
+
+  .mobile-tabs-container {
+    display: flex;
+    background: var(--bg-stage);
+    border: 1px solid var(--border-card);
+    border-radius: 14px;
+    padding: 4px;
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+
+  .mobile-tab-btn {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 4px;
+    border-radius: 10px;
+    font-size: clamp(11.5px, 3vw, 13.5px);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    background: transparent;
+    color: var(--text-muted);
+    border: none;
+    white-space: nowrap;
+  }
+
+  .mobile-tab-btn.active {
+    background: var(--bg-card);
+    color: var(--hogwarts-gold);
+    border: 1px solid var(--border-card);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* Mobile Live Guess Ticker & Reaction Bar */
+.mobile-live-ticker-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 56px;
+  overflow: hidden;
+}
+
+.mobile-live-ticker {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  animation: bounceIn 0.25s ease-out;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.mobile-live-ticker.correct {
+  background: rgba(45, 212, 191, 0.2);
+  border-left: 3px solid var(--accent-cyan);
+  color: #2dd4bf;
+  font-weight: 700;
+}
+.mobile-live-ticker.close {
+  background: rgba(255, 216, 117, 0.2);
+  border-left: 3px solid var(--hogwarts-gold);
+  color: var(--hogwarts-gold);
+  font-weight: 700;
+}
+.mobile-live-ticker.normal {
+  background: rgba(255, 255, 255, 0.05);
+  border-left: 3px solid rgba(255, 255, 255, 0.2);
+  color: #e2e8f0;
+}
+
+.mobile-quick-emojis {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 2px 4px;
+}
+
+.mobile-emoji-pill {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-card);
+  border-radius: 12px;
+  padding: 4px 8px;
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+  transition: transform 0.1s;
+}
+.mobile-emoji-pill:active {
+  transform: scale(1.2);
+}
+
+.word-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.canvas-toolbar {
+  background: var(--bg-card);
+  border: 2px solid var(--border-card);
+  border-radius: 16px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.canvas-parchment-container {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 16 / 10;
+  max-height: 100%;
+  min-height: 320px;
+  background: #ffffff;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: var(--card-shadow);
+  border: 4px solid var(--border-card);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+.waiting-room-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
+  gap: 16px;
+}
+
+.mobile-header-two-rows {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  padding: 6px 10px !important;
+  gap: 6px !important;
+}
+
+.mobile-header-row-1 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.mobile-header-row-2 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.color-swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(14, 1fr);
+  grid-template-rows: repeat(2, 16px);
+  gap: 2.5px;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .canvas-parchment-container {
+    min-height: 0 !important;
+    border-radius: 14px;
+    border-width: 3px;
+  }
+  .waiting-room-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .word-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .canvas-toolbar {
+    padding: 6px 8px;
+    gap: 6px;
+    justify-content: center;
+  }
+  .color-swatch-grid {
+    grid-template-columns: repeat(14, 1fr);
+    grid-template-rows: repeat(2, 20px);
+    gap: 2px;
+    overflow-x: hidden;
+    width: 100%;
+  }
+  .podium-container {
+    height: 180px !important;
+    gap: 6px !important;
+  }
+  .podium-modal {
+    padding: 16px 12px !important;
+    max-height: 96vh !important;
+  }
+  .word-picker-modal {
+    padding: 18px 14px !important;
+  }
+}
+
+/* Mobile Landscape Optimization */
+@media (max-height: 500px) and (orientation: landscape) {
+  .game-container {
+    padding: 4px 8px;
+  }
+  .game-header-bar {
+    padding: 4px 8px;
+    margin-bottom: 4px;
+  }
+  .mobile-tabs-container {
+    margin-bottom: 4px;
+  }
+  .canvas-toolbar {
+    padding: 4px 8px;
+    gap: 4px;
+  }
+}
