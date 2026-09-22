@@ -88,6 +88,11 @@ export const App: React.FC = () => {
   }, [round]);
 
   const [timeLeft, setTimeLeft] = useState<number>(60);
+  const timeLeftRef = useRef<number>(60);
+  useEffect(() => {
+    timeLeftRef.current = timeLeft;
+  }, [timeLeft]);
+
   const [players, setPlayers] = useState<Player[]>([]);
   const [currentDrawerIndex, setCurrentDrawerIndex] = useState<number>(0);
   const currentDrawerIndexRef = useRef<number>(0);
@@ -99,6 +104,10 @@ export const App: React.FC = () => {
 
   const [currentWord, setCurrentWord] = useState<string>('');
   const [maskedWord, setMaskedWord] = useState<string>('');
+  const maskedWordRef = useRef<string>('');
+  useEffect(() => {
+    maskedWordRef.current = maskedWord;
+  }, [maskedWord]);
   const [revealedIndices, setRevealedIndices] = useState<number[]>([]);
   const [wordChoices, setWordChoices] = useState<string[]>([]);
   const [roundEndMessage, setRoundEndMessage] = useState<string | null>(null);
@@ -199,6 +208,7 @@ export const App: React.FC = () => {
     setTimeLeft(15);
     setPhase('selecting_word');
     phaseRef.current = 'selecting_word';
+    setMobileTab('canvas');
     window.scrollTo({ top: 0, behavior: 'instant' });
 
     const activePlayers = customPlayers && customPlayers.length > 0 ? customPlayers : playersRef.current;
@@ -231,9 +241,10 @@ export const App: React.FC = () => {
         handleWordSelected(choices[Math.floor(Math.random() * choices.length)]);
       }, 1500);
     } else {
-      // Human drawer: set watchdog timer (16s) to auto-skip if they don't choose in time!
+      // Human drawer: set watchdog timer (16s) to auto-skip if they don't choose in time (host only)!
       selectionTimeoutRef.current = setTimeout(() => {
-        if (phaseRef.current === 'selecting_word') {
+        const me = playersRef.current.find((p) => p.id === currentUserId.current);
+        if (me?.isHost && phaseRef.current === 'selecting_word') {
           handleSkipDrawerRef.current();
         }
       }, 16000);
@@ -255,6 +266,7 @@ export const App: React.FC = () => {
     setTimeLeft(roomConfig.drawTime);
     setPhase('drawing');
     phaseRef.current = 'drawing';
+    setMobileTab('canvas');
 
     // Clear board for new drawing
     setIncomingDrawAction({ type: 'clear' });
@@ -470,9 +482,12 @@ export const App: React.FC = () => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          setTimeout(() => {
-            handleRoundEndRef.current();
-          }, 0);
+          const me = playersRef.current.find((p) => p.id === currentUserId.current);
+          if (me?.isHost) {
+            setTimeout(() => {
+              handleRoundEndRef.current();
+            }, 0);
+          }
           return 0;
         }
 
@@ -507,14 +522,31 @@ export const App: React.FC = () => {
 
   // 5. Guess & Chat Handler
   const handlePlayerGuess = (sender: Player, text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
     // If player is drawer or already guessed, treat as regular chat
     if (sender.isDrawer || sender.hasGuessed || phase !== 'drawing') {
+      // Anti-Spoiler: Don't leak secret word if drawer or already-guessed player types it
+      if (phase === 'drawing' && currentWordRef.current && isWordMatch(trimmed, currentWordRef.current)) {
+        const warningMsg: ChatMessage = {
+          id: `warn_${Date.now()}`,
+          playerId: sender.id,
+          playerName: sender.name,
+          text: '🤫 Suỵt! Bạn không được tiết lộ đáp án ma thuật cho người khác!',
+          type: 'close',
+          timestamp: Date.now(),
+        };
+        setMessages((prev) => [...prev, warningMsg]);
+        return;
+      }
+
       const msg: ChatMessage = {
-        id: `msg_${Date.now()}_${Math.random()}`,
+        id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         playerId: sender.id,
         playerName: sender.name,
         avatar: sender.avatar,
-        text,
+        text: trimmed,
         type: 'chat',
         timestamp: Date.now(),
       };
@@ -614,7 +646,12 @@ export const App: React.FC = () => {
   }, [handlePlayerGuess]);
 
   // Join or Create Room
-  const handleJoinRoom = (code: string, configOverrides?: Partial<RoomConfig>, addBots: boolean = false) => {
+  const handleJoinRoom = (
+    code: string,
+    configOverrides?: Partial<RoomConfig>,
+    addBots: boolean = false,
+    isCreating: boolean = true
+  ) => {
     setRoomCode(code);
     const newConfig: RoomConfig = {
       roomCode: code,
@@ -633,7 +670,7 @@ export const App: React.FC = () => {
       name: playerName,
       avatar,
       score: 0,
-      isHost: true,
+      isHost: isCreating,
       isDrawer: false,
       hasGuessed: false,
     };
@@ -645,6 +682,7 @@ export const App: React.FC = () => {
     }
 
     setPlayers(initialPlayers);
+    playersRef.current = initialPlayers;
 
     // Initialize Realtime Network
     const service = new RealtimeRoomService(code, initialHost, {
@@ -654,9 +692,13 @@ export const App: React.FC = () => {
         if (syncState.phase) {
           setPhase(syncState.phase);
           phaseRef.current = syncState.phase;
+          if (syncState.phase === 'drawing' || syncState.phase === 'selecting_word') {
+            setMobileTab('canvas');
+          }
         }
         if (syncState.players) {
           setPlayers(syncState.players);
+          playersRef.current = syncState.players;
         }
         if (syncState.currentWord) {
           setCurrentWord(syncState.currentWord);
@@ -674,13 +716,48 @@ export const App: React.FC = () => {
       },
       onPlayersUpdate: (onlinePlayers) => {
         setPlayers((prev) => {
-          const merged = [...prev];
-          onlinePlayers.forEach((op) => {
-            const exists = merged.find((p) => p.id === op.id);
-            if (!exists) merged.push(op);
-          });
-          return merged;
+          // Keep existing local bots
+          const bots = prev.filter((p) => p.isBot);
+          // Reconcile online humans from presence
+          const activeHumans = onlinePlayers
+            .filter((op) => !op.isBot)
+            .map((op) => {
+              const existing = prev.find((p) => p.id === op.id);
+              return {
+                ...op,
+                score: existing?.score ?? op.score ?? 0,
+                isDrawer: existing?.isDrawer ?? op.isDrawer ?? false,
+                hasGuessed: existing?.hasGuessed ?? op.hasGuessed ?? false,
+                isLoneGuesser: existing?.isLoneGuesser ?? op.isLoneGuesser ?? false,
+              };
+            });
+
+          // Ensure there is always a host (Host migration if host left)
+          let hasHost = activeHumans.some((h) => h.isHost);
+          if (!hasHost && activeHumans.length > 0) {
+            activeHumans[0].isHost = true;
+          }
+
+          const updated = [...activeHumans, ...bots];
+          playersRef.current = updated;
+          return updated;
         });
+      },
+      onRequestGameState: () => {
+        const me = playersRef.current.find((p) => p.id === currentUserId.current);
+        if (me?.isHost) {
+          roomServiceRef.current?.broadcastGameState({
+            phase: phaseRef.current,
+            round: roundRef.current,
+            drawTime: roomConfig.drawTime,
+            totalRounds: roomConfig.totalRounds,
+            timeLeft: timeLeftRef.current,
+            mode: roomConfig.mode,
+            currentWord: currentWordRef.current,
+            maskedWord: maskedWordRef.current,
+            players: playersRef.current,
+          });
+        }
       },
     });
 

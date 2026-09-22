@@ -9,7 +9,7 @@ interface LobbyProps {
   onPlayerNameChange: (name: string) => void;
   avatar: AvatarConfig;
   onAvatarChange: (avatar: AvatarConfig) => void;
-  onJoinRoom: (roomCode: string, config?: Partial<RoomConfig>, addBots?: boolean) => void;
+  onJoinRoom: (roomCode: string, config?: Partial<RoomConfig>, addBots?: boolean, isCreating?: boolean) => void;
 }
 
 export const Lobby: React.FC<LobbyProps> = ({
@@ -41,14 +41,14 @@ export const Lobby: React.FC<LobbyProps> = ({
       drawTime: 60,
       totalRounds: 3,
       language: 'vi',
-    }, true);
+    }, true, true);
   };
 
   const handleJoinByCode = (e: React.FormEvent) => {
     e.preventDefault();
     if (!playerName.trim() || !roomCodeInput.trim()) return;
     soundManager.playClick();
-    onJoinRoom(roomCodeInput.trim().toUpperCase());
+    onJoinRoom(roomCodeInput.trim().toUpperCase(), undefined, false, false);
   };
 
   const handleCreateCustom = () => {
@@ -65,7 +65,7 @@ export const Lobby: React.FC<LobbyProps> = ({
       totalRounds,
       language,
       customWords,
-    }, false);
+    }, false, true);
   };
 
   const handlePlaySoloWithBots = () => {
@@ -76,7 +76,7 @@ export const Lobby: React.FC<LobbyProps> = ({
       drawTime: 60,
       totalRounds: 3,
       language: 'vi',
-    }, true);
+    }, true, true);
   };
 
   return (

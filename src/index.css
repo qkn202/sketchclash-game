@@ -479,10 +479,11 @@ input:focus, select:focus {
   }
 
   .game-container.in-game-mobile {
-    height: 100vh;
-    height: 100dvh;
-    max-height: 100dvh;
-    overflow: hidden;
+    min-height: 100vh;
+    min-height: 100dvh;
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
     padding-bottom: 8px;
@@ -690,11 +691,18 @@ input:focus, select:focus {
   width: 100%;
 }
 
+.color-swatch-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+
 .color-swatch-grid {
   display: grid;
   grid-template-columns: repeat(14, 1fr);
-  grid-template-rows: repeat(2, 16px);
-  gap: 2.5px;
+  grid-template-rows: repeat(2, 18px);
+  gap: 3px;
   width: 100%;
 }
 
@@ -720,11 +728,10 @@ input:focus, select:focus {
     justify-content: center;
   }
   .color-swatch-grid {
-    grid-template-columns: repeat(14, 1fr);
-    grid-template-rows: repeat(2, 20px);
-    gap: 2px;
-    overflow-x: hidden;
-    width: 100%;
+    grid-template-columns: repeat(14, 28px);
+    grid-template-rows: repeat(2, 26px);
+    gap: 4px;
+    width: max-content;
   }
   .podium-container {
     height: 180px !important;

@@ -92,9 +92,11 @@ export const WordPickerModal: React.FC<WordPickerModalProps> = ({
           background: 'var(--bg-card)',
           border: '3px solid var(--hogwarts-gold)',
           borderRadius: '24px',
-          padding: '28px',
+          padding: 'clamp(18px, 4vw, 28px)',
           maxWidth: '560px',
           width: '100%',
+          maxHeight: '92vh',
+          overflowY: 'auto',
           boxShadow: 'var(--card-shadow)',
           textAlign: 'center',
         }}

@@ -265,7 +265,7 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
     }
   }, [incomingAction, renderStroke, renderFill, clearBoard]);
 
-  const getCanvasCoords = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>): Point | null => {
+  const getCanvasCoords = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement> | MouseEvent | TouchEvent): Point | null => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
 
@@ -288,8 +288,8 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
         clientY = e.touches[0].clientY;
       }
     } else {
-      clientX = e.clientX;
-      clientY = e.clientY;
+      clientX = (e as MouseEvent).clientX;
+      clientY = (e as MouseEvent).clientY;
     }
 
     // Determine actual rendered content box inside canvas (handles any aspect-ratio letterboxing or scaling)
@@ -324,7 +324,7 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
 
   const handlePointerDown = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     if (!isDrawer) return;
-    e.preventDefault();
+    if ('preventDefault' in e) e.preventDefault();
 
     const pt = getCanvasCoords(e);
     if (!pt) return;
@@ -365,7 +365,7 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
 
   const handlePointerMove = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     if (!isDrawer || !isDrawing.current || !currentStroke.current) return;
-    e.preventDefault();
+    if ('preventDefault' in e) e.preventDefault();
 
     const pt = getCanvasCoords(e);
     if (!pt) return;
@@ -383,9 +383,9 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
     }
   };
 
-  const handlePointerUp = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+  const handlePointerUp = (e?: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     if (!isDrawer || !isDrawing.current || !currentStroke.current) return;
-    e.preventDefault();
+    if (e && 'preventDefault' in e) e.preventDefault();
 
     const stroke = currentStroke.current;
     isDrawing.current = false;
@@ -393,7 +393,10 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
 
     onBroadcastDraw({
       type: 'stroke',
-      stroke,
+      stroke: {
+        ...stroke,
+        points: stroke.points.length > 4 ? stroke.points.slice(-4) : stroke.points,
+      },
     });
   };
 
@@ -487,6 +490,21 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
   }, [isDrawer, undoStack]);
 
   useEffect(() => {
+    const handleGlobalMove = (e: MouseEvent | TouchEvent) => {
+      if (!isDrawer || !isDrawing.current || !currentStroke.current) return;
+      const pt = getCanvasCoords(e);
+      if (!pt) return;
+      const stroke = currentStroke.current;
+      stroke.points.push(pt);
+      renderStroke(stroke);
+      if (stroke.points.length % 3 === 0) {
+        onBroadcastDraw({
+          type: 'stroke',
+          stroke: { ...stroke, points: stroke.points.slice(-4) },
+        });
+      }
+    };
+
     const handleGlobalPointerUp = () => {
       if (isDrawing.current && currentStroke.current) {
         const stroke = currentStroke.current;
@@ -494,18 +512,25 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
         currentStroke.current = null;
         onBroadcastDraw({
           type: 'stroke',
-          stroke,
+          stroke: {
+            ...stroke,
+            points: stroke.points.length > 4 ? stroke.points.slice(-4) : stroke.points,
+          },
         });
       }
     };
 
+    window.addEventListener('mousemove', handleGlobalMove);
+    window.addEventListener('touchmove', handleGlobalMove, { passive: true });
     window.addEventListener('mouseup', handleGlobalPointerUp);
     window.addEventListener('touchend', handleGlobalPointerUp);
     return () => {
+      window.removeEventListener('mousemove', handleGlobalMove);
+      window.removeEventListener('touchmove', handleGlobalMove);
       window.removeEventListener('mouseup', handleGlobalPointerUp);
       window.removeEventListener('touchend', handleGlobalPointerUp);
     };
-  }, [onBroadcastDraw]);
+  }, [isDrawer, onBroadcastDraw, renderStroke]);
 
   const toolbarContent = isDrawer ? (
     <div className="canvas-toolbar">
@@ -660,26 +685,28 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
       </div>
 
       {/* Row 3: Hogwarts Color Grid */}
-      <div className="color-swatch-grid">
-        {HOGWARTS_MAGIC_COLORS.map((c) => (
-          <button
-            key={c}
-            type="button"
-            onClick={() => { soundManager.playToolSelect(); setColor(c); if (tool === 'eraser') setTool('brush'); }}
-            style={{
-              width: '100%',
-              height: '100%',
-              minWidth: '15px',
-              minHeight: '15px',
-              borderRadius: '3px',
-              background: c,
-              border: color === c ? '2px solid #ffd875' : '1px solid rgba(0,0,0,0.5)',
-              transform: color === c ? 'scale(1.2)' : 'scale(1)',
-              boxShadow: color === c ? '0 0 6px rgba(255,216,117,0.8)' : 'none',
-              zIndex: color === c ? 2 : 1,
-            }}
-          />
-        ))}
+      <div className="color-swatch-container">
+        <div className="color-swatch-grid">
+          {HOGWARTS_MAGIC_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => { soundManager.playToolSelect(); setColor(c); if (tool === 'eraser') setTool('brush'); }}
+              style={{
+                width: '100%',
+                height: '100%',
+                minWidth: '15px',
+                minHeight: '15px',
+                borderRadius: '4px',
+                background: c,
+                border: color === c ? '2px solid #ffd875' : '1px solid rgba(0,0,0,0.5)',
+                transform: color === c ? 'scale(1.15)' : 'scale(1)',
+                boxShadow: color === c ? '0 0 6px rgba(255,216,117,0.8)' : 'none',
+                zIndex: color === c ? 2 : 1,
+              }}
+            />
+          ))}
+        </div>
       </div>
     </div>
   ) : null;

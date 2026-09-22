@@ -128,63 +128,25 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
           </div>
         </div>
 
-        {/* Room Code & Quick Start Header Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          {isHost && (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  soundManager.playClick();
-                  onAddBot();
-                }}
-                className="btn-gryffindor"
-                style={{ padding: '8px 12px', fontSize: '13px', borderRadius: '10px' }}
-                title="Thêm học sinh Hogwarts AI vào phòng"
-              >
-                <Bot size={15} /> +Bot
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  soundManager.playSpellVfx();
-                  onStartGame();
-                }}
-                disabled={!canStart}
-                className="btn-primary"
-                style={{
-                  padding: '8px 16px',
-                  fontSize: '13px',
-                  fontWeight: 900,
-                  borderRadius: '10px',
-                  boxShadow: canStart ? '0 4px 14px rgba(255, 216, 117, 0.4)' : 'none',
-                }}
-                title={canStart ? 'Khai mạc ván đấu ngay' : 'Cần ít nhất 2 phù thủy để bắt đầu'}
-              >
-                <Play size={15} />
-                <span>Bắt Đầu Ngay</span>
-              </button>
-            </>
-          )}
-
+        {/* Room Code & Copy */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div
             style={{
               background: 'rgba(0, 0, 0, 0.4)',
               border: '1px solid var(--border-gold)',
               borderRadius: '12px',
-              padding: '6px 12px',
+              padding: '6px 10px',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
+              gap: '6px',
             }}
           >
             <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>MÃ:</span>
             <span
               style={{
-                fontSize: '15px',
+                fontSize: '14px',
                 fontWeight: 800,
-                letterSpacing: '1.5px',
+                letterSpacing: '1px',
                 color: 'var(--accent-cyan)',
               }}
               className="font-cinzel"
@@ -198,10 +160,10 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
             onClick={handleCopyCode}
             className="btn-icon"
             title="Sao chép mã phòng gửi bạn bè"
-            style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '4px', minHeight: '34px' }}
           >
-            {copied ? <Check size={16} color="#4ade80" /> : <Copy size={16} />}
-            <span style={{ fontSize: '12px' }}>{copied ? 'Đã chép!' : 'Chép'}</span>
+            {copied ? <Check size={14} color="#4ade80" /> : <Copy size={14} />}
+            <span style={{ fontSize: '11px' }}>{copied ? 'Đã chép!' : 'Chép'}</span>
           </button>
         </div>
       </div>

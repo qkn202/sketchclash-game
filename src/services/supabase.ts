@@ -24,6 +24,13 @@ export interface RoomSubscriptionCallbacks {
   onChatMessage: (message: ChatMessage) => void;
   onGameStateSync: (state: Partial<GameState>) => void;
   onPlayersUpdate: (players: Player[]) => void;
+  onRequestGameState?: () => void;
+}
+
+interface Envelope<T> {
+  _eid: string;
+  senderId: string;
+  payload: T;
 }
 
 export class RealtimeRoomService {
@@ -32,11 +39,24 @@ export class RealtimeRoomService {
   private roomCode: string;
   private player: Player;
   private callbacks: RoomSubscriptionCallbacks;
+  private processedEventIds: Set<string> = new Set();
+  private maxHistory: number = 150;
 
   constructor(roomCode: string, player: Player, callbacks: RoomSubscriptionCallbacks) {
     this.roomCode = roomCode.toUpperCase();
     this.player = player;
     this.callbacks = callbacks;
+  }
+
+  private isDuplicate(eid?: string): boolean {
+    if (!eid) return false;
+    if (this.processedEventIds.has(eid)) return true;
+    this.processedEventIds.add(eid);
+    if (this.processedEventIds.size > this.maxHistory) {
+      const first = this.processedEventIds.values().next().value;
+      if (first) this.processedEventIds.delete(first);
+    }
+    return false;
   }
 
   public connect(): void {
@@ -52,19 +72,28 @@ export class RealtimeRoomService {
     });
 
     this.channel
-      .on('broadcast', { event: 'draw_action' }, (payload) => {
-        if (payload.payload) {
-          this.callbacks.onDrawAction(payload.payload as DrawAction);
+      .on('broadcast', { event: 'draw_action' }, (event) => {
+        const env = event.payload as Envelope<DrawAction>;
+        if (env && !this.isDuplicate(env._eid)) {
+          this.callbacks.onDrawAction(env.payload);
         }
       })
-      .on('broadcast', { event: 'chat_message' }, (payload) => {
-        if (payload.payload) {
-          this.callbacks.onChatMessage(payload.payload as ChatMessage);
+      .on('broadcast', { event: 'chat_message' }, (event) => {
+        const env = event.payload as Envelope<ChatMessage>;
+        if (env && !this.isDuplicate(env._eid)) {
+          this.callbacks.onChatMessage(env.payload);
         }
       })
-      .on('broadcast', { event: 'game_state_sync' }, (payload) => {
-        if (payload.payload) {
-          this.callbacks.onGameStateSync(payload.payload as Partial<GameState>);
+      .on('broadcast', { event: 'game_state_sync' }, (event) => {
+        const env = event.payload as Envelope<Partial<GameState>>;
+        if (env && !this.isDuplicate(env._eid)) {
+          this.callbacks.onGameStateSync(env.payload);
+        }
+      })
+      .on('broadcast', { event: 'request_state' }, (event) => {
+        const env = event.payload as Envelope<{ requesterId: string }>;
+        if (env && env.senderId !== this.player.id && this.callbacks.onRequestGameState) {
+          this.callbacks.onRequestGameState();
         }
       })
       .on('presence', { event: 'sync' }, () => {
@@ -80,86 +109,126 @@ export class RealtimeRoomService {
           });
         });
 
-        if (onlinePlayers.length > 0) {
-          this.callbacks.onPlayersUpdate(onlinePlayers);
-        }
+        this.callbacks.onPlayersUpdate(onlinePlayers);
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED' && this.channel) {
           await this.channel.track({ player: this.player });
+          // Request initial game state from host if joining
+          this.requestGameState();
         }
       });
 
-    // 2. Browser BroadcastChannel (Instant zero-latency tab-to-tab sync on localhost)
+    // 2. Browser BroadcastChannel (Instant zero-latency tab-to-tab fallback)
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       try {
         this.localChannel = new BroadcastChannel(`local_${chanName}`);
         this.localChannel.onmessage = (event) => {
-          const { type, payload, senderId } = event.data;
-          if (senderId === this.player.id) return; // ignore own echo
+          const { type, env } = event.data as { type: string; env: Envelope<any> };
+          if (!env || env.senderId === this.player.id) return;
+          if (this.isDuplicate(env._eid)) return;
 
           if (type === 'draw_action') {
-            this.callbacks.onDrawAction(payload);
+            this.callbacks.onDrawAction(env.payload);
           } else if (type === 'chat_message') {
-            this.callbacks.onChatMessage(payload);
+            this.callbacks.onChatMessage(env.payload);
           } else if (type === 'game_state_sync') {
-            this.callbacks.onGameStateSync(payload);
+            this.callbacks.onGameStateSync(env.payload);
+          } else if (type === 'request_state') {
+            this.callbacks.onRequestGameState?.();
           }
         };
       } catch {
-        // Local BroadcastChannel optional fallback
+        // BroadcastChannel optional fallback
       }
     }
   }
 
+  public updatePresencePlayer(updatedPlayer: Player): void {
+    this.player = updatedPlayer;
+    if (this.channel) {
+      this.channel.track({ player: updatedPlayer }).catch(() => {});
+    }
+  }
+
+  public requestGameState(): void {
+    const env: Envelope<{ requesterId: string }> = {
+      _eid: `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      senderId: this.player.id,
+      payload: { requesterId: this.player.id },
+    };
+    if (this.channel) {
+      this.channel.send({
+        type: 'broadcast',
+        event: 'request_state',
+        payload: env,
+      });
+    }
+    if (this.localChannel) {
+      this.localChannel.postMessage({ type: 'request_state', env });
+    }
+  }
+
   public broadcastDraw(action: DrawAction): void {
+    const eid = `draw_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    this.processedEventIds.add(eid);
+    const env: Envelope<DrawAction> = {
+      _eid: eid,
+      senderId: this.player.id,
+      payload: action,
+    };
+
     if (this.channel) {
       this.channel.send({
         type: 'broadcast',
         event: 'draw_action',
-        payload: action,
+        payload: env,
       });
     }
     if (this.localChannel) {
-      this.localChannel.postMessage({
-        type: 'draw_action',
-        payload: action,
-        senderId: this.player.id,
-      });
+      this.localChannel.postMessage({ type: 'draw_action', env });
     }
   }
 
   public broadcastChat(message: ChatMessage): void {
+    const eid = `chat_${message.id || Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    this.processedEventIds.add(eid);
+    const env: Envelope<ChatMessage> = {
+      _eid: eid,
+      senderId: this.player.id,
+      payload: message,
+    };
+
     if (this.channel) {
       this.channel.send({
         type: 'broadcast',
         event: 'chat_message',
-        payload: message,
+        payload: env,
       });
     }
     if (this.localChannel) {
-      this.localChannel.postMessage({
-        type: 'chat_message',
-        payload: message,
-        senderId: this.player.id,
-      });
+      this.localChannel.postMessage({ type: 'chat_message', env });
     }
   }
 
   public broadcastGameState(state: Partial<GameState>): void {
+    const eid = `state_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    this.processedEventIds.add(eid);
+    const env: Envelope<Partial<GameState>> = {
+      _eid: eid,
+      senderId: this.player.id,
+      payload: state,
+    };
+
     if (this.channel) {
       this.channel.send({
         type: 'broadcast',
         event: 'game_state_sync',
-        payload: state,
+        payload: env,
       });
     }
     if (this.localChannel) {
-      this.localChannel.postMessage({
-        type: 'game_state_sync',
-        payload: state,
-        senderId: this.player.id,
-      });
+      this.localChannel.postMessage({ type: 'game_state_sync', env });
     }
   }
 
