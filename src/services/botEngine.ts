@@ -38,7 +38,7 @@ export function createBotPlayer(index: number = 0): Player {
 /**
  * Generate magical procedural drawings for Bot Drawer
  */
-export function generateProceduralDrawing(word: string): DrawAction[] {
+export function generateProceduralDrawing(word: string, drawerId?: string): DrawAction[] {
   const actions: DrawAction[] = [];
   const lower = word.toLowerCase();
 
@@ -180,7 +180,7 @@ export function generateProceduralDrawing(word: string): DrawAction[] {
     ], '#10ac84', 12));
   }
 
-  return actions;
+  return drawerId ? actions.map((a) => ({ ...a, drawerId })) : actions;
 }
 
 function createLineStroke(points: Point[], color: string, size: number): DrawAction {

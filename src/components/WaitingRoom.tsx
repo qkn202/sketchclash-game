@@ -34,6 +34,14 @@ const GAME_MODES: GameModeOption[] = [
     desc: 'Từng pháp sư lần lượt múa đũa vẽ bảo bối bí mật, những người còn lại so tài tốc độ giải mã.',
   },
   {
+    id: 'rush_draw',
+    name: 'Đuổi Hình Bắt Chữ',
+    subtitle: 'Vừa Vẽ Vừa Đoán Đồng Thời',
+    icon: '⚡',
+    badge: 'MỚI • Đấu Trí Tốc Độ',
+    desc: 'Mỗi người nhận 1 từ khóa bí mật riêng biệt! Tất cả cùng lúc vừa vẽ tranh của mình, vừa soi tranh đối thủ để gõ đoán ghi điểm.',
+  },
+  {
     id: 'dual_coop',
     name: 'Song Kiếm Hợp Bích',
     subtitle: '2 Phù Thủy Cùng Vẽ Song Song',
@@ -229,12 +237,20 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
                     textAlign: 'left',
                     cursor: isHost ? 'pointer' : 'default',
                     background: isSelected
-                      ? 'linear-gradient(135deg, rgba(212, 175, 55, 0.24) 0%, rgba(116, 0, 1, 0.28) 100%)'
+                      ? mode.id === 'rush_draw'
+                        ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.28) 0%, rgba(124, 58, 237, 0.22) 100%)'
+                        : 'linear-gradient(135deg, rgba(212, 175, 55, 0.24) 0%, rgba(116, 0, 1, 0.28) 100%)'
                       : 'rgba(255, 255, 255, 0.03)',
                     border: isSelected
-                      ? '2px solid var(--hogwarts-gold)'
+                      ? mode.id === 'rush_draw'
+                        ? '2px solid #c084fc'
+                        : '2px solid var(--hogwarts-gold)'
                       : '1px solid rgba(255, 255, 255, 0.08)',
-                    boxShadow: isSelected ? '0 0 16px rgba(255, 216, 117, 0.25)' : 'none',
+                    boxShadow: isSelected
+                      ? mode.id === 'rush_draw'
+                        ? '0 0 18px rgba(192, 132, 252, 0.35)'
+                        : '0 0 16px rgba(255, 216, 117, 0.25)'
+                      : 'none',
                     transition: 'all 0.2s ease',
                     position: 'relative',
                     overflow: 'hidden',
@@ -251,7 +267,11 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
                       alignItems: 'center',
                       justifyContent: 'center',
                       flexShrink: 0,
-                      border: isSelected ? '1px solid var(--hogwarts-gold)' : 'none',
+                      border: isSelected
+                        ? mode.id === 'rush_draw'
+                          ? '1px solid #c084fc'
+                          : '1px solid var(--hogwarts-gold)'
+                        : 'none',
                     }}
                   >
                     {mode.icon}
@@ -259,25 +279,49 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-                      <span
-                        style={{
-                          fontSize: '14px',
-                          fontWeight: 800,
-                          color: isSelected ? 'var(--hogwarts-gold)' : '#fff',
-                        }}
-                        className="font-cinzel"
-                      >
-                        {mode.name}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span
+                          style={{
+                            fontSize: '14px',
+                            fontWeight: 800,
+                            color: isSelected
+                              ? mode.id === 'rush_draw'
+                                ? '#e9d5ff'
+                                : 'var(--hogwarts-gold)'
+                              : '#fff',
+                          }}
+                          className="font-cinzel"
+                        >
+                          {mode.name}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '9px',
+                            background: mode.id === 'rush_draw'
+                              ? 'linear-gradient(135deg, #9333ea 0%, #6b21a8 100%)'
+                              : 'rgba(255, 255, 255, 0.1)',
+                            border: mode.id === 'rush_draw'
+                              ? '1px solid #c084fc'
+                              : '1px solid rgba(255, 255, 255, 0.15)',
+                            color: '#fff',
+                            padding: '1px 6px',
+                            borderRadius: '6px',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {mode.badge}
+                        </span>
+                      </div>
                       {isSelected && (
                         <span
                           style={{
                             fontSize: '9px',
-                            background: 'var(--hogwarts-gold)',
-                            color: '#261601',
+                            background: mode.id === 'rush_draw' ? '#c084fc' : 'var(--hogwarts-gold)',
+                            color: mode.id === 'rush_draw' ? '#2e1065' : '#261601',
                             padding: '2px 6px',
                             borderRadius: '8px',
                             fontWeight: 800,
+                            flexShrink: 0,
                           }}
                         >
                           ĐANG CHỌN
@@ -287,9 +331,13 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
                     <div
                       style={{
                         fontSize: '11px',
-                        color: isSelected ? '#fef08a' : 'var(--text-muted)',
+                        color: isSelected
+                          ? mode.id === 'rush_draw'
+                            ? '#d8b4fe'
+                            : '#fef08a'
+                          : 'var(--text-muted)',
                         fontWeight: 600,
-                        marginTop: '1px',
+                        marginTop: '2px',
                       }}
                     >
                       {mode.subtitle}
@@ -428,6 +476,7 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
               {selectedMode.id === 'classic' && 'Mỗi lượt 1 người vẽ, tất cả cùng gõ phím giải mã tên bảo bối.'}
               {selectedMode.id === 'dual_coop' && 'Mỗi lượt 2 người cùng vẽ song song! Đoán đúng sẽ cộng điểm cho cả 2 họa sĩ.'}
               {selectedMode.id === 'all_draw' && 'Chỉ 1 người đoán! Tất cả những người còn lại đều cầm đũa vẽ cùng lúc để gợi ý.'}
+              {selectedMode.id === 'rush_draw' && 'Tất cả cùng nhận từ khóa riêng và cùng vẽ! Vừa vẽ vừa soi tranh đối thủ để gõ đoán ghi điểm.'}
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Player, AvatarConfig, RoomConfig, GameState, DrawAction, ChatMessage, GamePhase, GameMode } from './types';
-import { getRandomWordChoices, createMaskedWord, isWordMatch, levenshteinDistance } from './data/words';
+import { getRandomWordChoices, createMaskedWord, isWordMatch, levenshteinDistance, WORDS } from './data/words';
 import { RealtimeRoomService } from './services/supabase';
 import { createBotPlayer, generateProceduralDrawing, getBotGuess } from './services/botEngine';
 import { soundManager } from './utils/audio';
@@ -12,7 +12,9 @@ import { ScoreBoard } from './components/ScoreBoard';
 import { ChatPanel } from './components/ChatPanel';
 import { WordPickerModal } from './components/WordPickerModal';
 import { VictoryPodium } from './components/VictoryPodium';
-import { Volume2, VolumeX, Clock, ArrowLeft, Palette, MessageSquare, Trophy, Send, Users } from 'lucide-react';
+import { MiniCanvasBoard } from './components/MiniCanvasBoard';
+import { InspectBoardModal } from './components/InspectBoardModal';
+import { Volume2, VolumeX, Clock, ArrowLeft, Palette, MessageSquare, Trophy, Send, Users, Eye, Sparkles, CheckCircle2, Maximize2, Minimize2 } from 'lucide-react';
 
 const DEFAULT_AVATAR: AvatarConfig = {
   color: '#FFD166',
@@ -23,11 +25,25 @@ const DEFAULT_AVATAR: AvatarConfig = {
 
 export const App: React.FC = () => {
   // Mobile responsive view tabs
-  const [mobileTab, setMobileTab] = useState<'canvas' | 'chat' | 'scores'>('canvas');
+  const [mobileTab, setMobileTab] = useState<'canvas' | 'opponents' | 'chat' | 'scores'>('canvas');
   const [mobileGuessInput, setMobileGuessInput] = useState('');
   const [isMobile, setIsMobile] = useState<boolean>(() => {
     return typeof window !== 'undefined' ? window.innerWidth <= 820 : false;
   });
+
+  // Rush Draw (Đuổi hình bắt chữ) state
+  const [opponentDrawActions, setOpponentDrawActions] = useState<Record<string, DrawAction[]>>({});
+  const [inspectingPlayerId, setInspectingPlayerId] = useState<string | null>(null);
+  const [rushViewTab, setRushViewTab] = useState<'my_board' | 'opponents'>('my_board');
+  const [isCanvasMaximized, setIsCanvasMaximized] = useState<boolean>(false);
+  const [showMiniOpponentsStrip, setShowMiniOpponentsStrip] = useState<boolean>(false);
+  const [myRushDrawActions, setMyRushDrawActions] = useState<DrawAction[]>([]);
+  const botTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
+
+  const clearBotTimeouts = () => {
+    botTimeoutsRef.current.forEach((t) => clearTimeout(t));
+    botTimeoutsRef.current = [];
+  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -163,7 +179,16 @@ export const App: React.FC = () => {
     setPlayers((prev) => {
       const sourcePlayers = customPlayers && customPlayers.length > 0 ? customPlayers : prev;
       if (sourcePlayers.length === 0) return sourcePlayers;
-      if (currentMode === 'all_draw') {
+      if (currentMode === 'rush_draw') {
+        return sourcePlayers.map((p) => ({
+          ...p,
+          isDrawer: true,
+          hasGuessed: false,
+          isLoneGuesser: false,
+          solvedOpponentIds: [],
+          solvedByPlayerIds: [],
+        }));
+      } else if (currentMode === 'all_draw') {
         const guesserIdx = (turnIdx + 1) % sourcePlayers.length;
         return sourcePlayers.map((p, idx) => ({
           ...p,
@@ -205,6 +230,8 @@ export const App: React.FC = () => {
     setMaskedWord('');
     setRevealedIndices([]);
     setRoundEndMessage(null);
+    setOpponentDrawActions({});
+    setMyRushDrawActions([]);
     setTimeLeft(15);
     setPhase('selecting_word');
     phaseRef.current = 'selecting_word';
@@ -235,7 +262,14 @@ export const App: React.FC = () => {
       isBotTurn = !!(activePlayers[d1]?.isBot && activePlayers[d2]?.isBot);
     }
 
-    if (isBotTurn) {
+    if (currentMode === 'rush_draw') {
+      // In rush draw, auto-select first word for human if timer runs out
+      selectionTimeoutRef.current = setTimeout(() => {
+        if (phaseRef.current === 'selecting_word') {
+          handleWordSelected(choices[0]);
+        }
+      }, 15000);
+    } else if (isBotTurn) {
       // Bot chooses word quickly after 1.5s
       selectionTimeoutRef.current = setTimeout(() => {
         handleWordSelected(choices[Math.floor(Math.random() * choices.length)]);
@@ -263,18 +297,22 @@ export const App: React.FC = () => {
     const initialMask = createMaskedWord(chosenWord, []);
     setMaskedWord(initialMask);
     setRevealedIndices([]);
-    setTimeLeft(roomConfig.drawTime);
+    const roundDuration = roomConfig.mode === 'rush_draw' ? (roomConfig.drawTime || 90) : roomConfig.drawTime;
+    setTimeLeft(roundDuration);
     setPhase('drawing');
     phaseRef.current = 'drawing';
     setMobileTab('canvas');
 
     // Clear board for new drawing
     setIncomingDrawAction({ type: 'clear' });
+    setOpponentDrawActions({});
     roomServiceRef.current?.broadcastDraw({ type: 'clear' });
 
     // Mode-specific announcement in chat
     let introText = `🪄 ${currentDrawer?.name || 'Pháp sư'} đã chọn bùa vẽ và bắt đầu múa đũa phép!`;
-    if (roomConfig.mode === 'dual_coop') {
+    if (roomConfig.mode === 'rush_draw') {
+      introText = `⚡ ĐUỔI HÌNH BẮT CHỮ BẮT ĐẦU! Tất cả các phù thủy cùng lúc múa đũa vẽ và soi tranh đối thủ để giải mã!`;
+    } else if (roomConfig.mode === 'dual_coop') {
       const coDrawers = players.filter((p) => p.isDrawer).map((p) => p.name).join(' & ');
       introText = `🤝 ${coDrawers || 'Hai pháp sư'} đang Song Kiếm Hợp Bích cùng múa đũa vẽ!`;
     } else if (roomConfig.mode === 'all_draw') {
@@ -291,49 +329,95 @@ export const App: React.FC = () => {
     setMessages((prev) => [...prev, sysMsg]);
     roomServiceRef.current?.broadcastChat(sysMsg);
 
-    roomServiceRef.current?.broadcastGameState({
-      phase: 'drawing',
-      currentWord: chosenWord,
-      maskedWord: initialMask,
-      timeLeft: roomConfig.drawTime,
-      mode: roomConfig.mode,
-      players: playersRef.current,
-    });
+    if (roomConfig.mode === 'rush_draw') {
+      const pool = WORDS[roomConfig.language] || WORDS.vi;
+      const usedWords = new Set<string>([chosenWord.toLowerCase()]);
+      const updatedPlayers = playersRef.current.map((p) => {
+        if (p.id === currentUserId.current) {
+          return { ...p, secretWord: chosenWord, isDrawer: true, solvedOpponentIds: [], solvedByPlayerIds: [] };
+        }
+        if (p.isBot) {
+          const available = pool.filter((w) => !usedWords.has(w.toLowerCase()));
+          const botWord = available.length > 0
+            ? available[Math.floor(Math.random() * available.length)]
+            : pool[Math.floor(Math.random() * pool.length)];
+          usedWords.add(botWord.toLowerCase());
+          return { ...p, secretWord: botWord, isDrawer: true, solvedOpponentIds: [], solvedByPlayerIds: [] };
+        }
+        return { ...p, isDrawer: true, solvedOpponentIds: [], solvedByPlayerIds: [] };
+      });
 
-    // Bot drawing simulation
-    if (roomConfig.mode === 'all_draw') {
-      const botDrawers = players.filter((p) => p.isBot && p.isDrawer);
-      if (botDrawers.length > 0) {
-        const botStrokes = generateProceduralDrawing(chosenWord);
+      setPlayers(updatedPlayers);
+      playersRef.current = updatedPlayers;
+
+      roomServiceRef.current?.broadcastGameState({
+        phase: 'drawing',
+        timeLeft: roundDuration,
+        mode: roomConfig.mode,
+        players: updatedPlayers,
+      });
+
+      // Bot drawing simulation for all bots concurrently
+      clearBotTimeouts();
+      const botDrawers = updatedPlayers.filter((p) => p.isBot && p.secretWord);
+      botDrawers.forEach((bot) => {
+        const botStrokes = generateProceduralDrawing(bot.secretWord!, bot.id);
         botStrokes.forEach((action, idx) => {
-          setTimeout(() => {
-            setIncomingDrawAction(action);
+          const timeoutId = setTimeout(() => {
+            setOpponentDrawActions((prev) => ({
+              ...prev,
+              [bot.id]: [...(prev[bot.id] || []), action],
+            }));
             roomServiceRef.current?.broadcastDraw(action);
-          }, (idx + 1) * 700);
+          }, 1200 + (idx + 1) * 850);
+          botTimeoutsRef.current.push(timeoutId);
         });
-      }
-    } else if (roomConfig.mode === 'dual_coop') {
-      const botDrawers = players.filter((p) => p.isBot && p.isDrawer);
-      if (botDrawers.length > 0) {
-        const humanIsDrawer = currentPlayer.isDrawer;
-        const startDelay = humanIsDrawer ? 2500 : 500;
-        const botStrokes = generateProceduralDrawing(chosenWord);
-        botStrokes.forEach((action, idx) => {
-          setTimeout(() => {
-            setIncomingDrawAction(action);
-            roomServiceRef.current?.broadcastDraw(action);
-          }, startDelay + (idx + 1) * 700);
-        });
-      }
+      });
     } else {
-      if (currentDrawer?.isBot) {
-        const botStrokes = generateProceduralDrawing(chosenWord);
-        botStrokes.forEach((action, idx) => {
-          setTimeout(() => {
-            setIncomingDrawAction(action);
-            roomServiceRef.current?.broadcastDraw(action);
-          }, (idx + 1) * 600);
-        });
+      roomServiceRef.current?.broadcastGameState({
+        phase: 'drawing',
+        currentWord: chosenWord,
+        maskedWord: initialMask,
+        timeLeft: roomConfig.drawTime,
+        mode: roomConfig.mode,
+        players: playersRef.current,
+      });
+
+      // Bot drawing simulation
+      if (roomConfig.mode === 'all_draw') {
+        const botDrawers = players.filter((p) => p.isBot && p.isDrawer);
+        if (botDrawers.length > 0) {
+          const botStrokes = generateProceduralDrawing(chosenWord);
+          botStrokes.forEach((action, idx) => {
+            setTimeout(() => {
+              setIncomingDrawAction(action);
+              roomServiceRef.current?.broadcastDraw(action);
+            }, (idx + 1) * 700);
+          });
+        }
+      } else if (roomConfig.mode === 'dual_coop') {
+        const botDrawers = players.filter((p) => p.isBot && p.isDrawer);
+        if (botDrawers.length > 0) {
+          const humanIsDrawer = currentPlayer.isDrawer;
+          const startDelay = humanIsDrawer ? 2500 : 500;
+          const botStrokes = generateProceduralDrawing(chosenWord);
+          botStrokes.forEach((action, idx) => {
+            setTimeout(() => {
+              setIncomingDrawAction(action);
+              roomServiceRef.current?.broadcastDraw(action);
+            }, startDelay + (idx + 1) * 700);
+          });
+        }
+      } else {
+        if (currentDrawer?.isBot) {
+          const botStrokes = generateProceduralDrawing(chosenWord);
+          botStrokes.forEach((action, idx) => {
+            setTimeout(() => {
+              setIncomingDrawAction(action);
+              roomServiceRef.current?.broadcastDraw(action);
+            }, (idx + 1) * 600);
+          });
+        }
       }
     }
   };
@@ -390,8 +474,35 @@ export const App: React.FC = () => {
   const handleRoundEnd = useCallback(() => {
     if (isEndingRound.current) return;
     isEndingRound.current = true;
+    clearBotTimeouts();
     setPhase('round_end');
     phaseRef.current = 'round_end';
+
+    if (roomConfig.mode === 'rush_draw') {
+      const summaryList = playersRef.current
+        .filter((p) => p.secretWord)
+        .map((p) => `${p.name}: "${p.secretWord}"`);
+      setRoundEndMessage(`Từ khóa các phù thủy vừa vẽ:\n${summaryList.join(' • ')}`);
+      soundManager.playVictory();
+
+      setTimeout(() => {
+        const currentPlayers = playersRef.current;
+        if (currentPlayers.length === 0) return;
+        const nextRound = roundRef.current + 1;
+        if (nextRound > roomConfig.totalRounds) {
+          setPhase('game_over');
+          phaseRef.current = 'game_over';
+          roomServiceRef.current?.broadcastGameState({
+            phase: 'game_over',
+            players: currentPlayers,
+          });
+        } else {
+          startNewTurn(0, nextRound, currentPlayers);
+        }
+      }, 5000);
+      return;
+    }
+
     setRoundEndMessage(`Từ khóa vừa rồi là: "${currentWordRef.current}"`);
     soundManager.playVictory();
 
@@ -415,7 +526,7 @@ export const App: React.FC = () => {
         startNewTurn(nextDrawerIdx, nextRound, currentPlayers);
       }
     }, 4500);
-  }, [roomConfig.totalRounds, startNewTurn]);
+  }, [roomConfig.totalRounds, roomConfig.mode, startNewTurn]);
 
   const handleRoundEndRef = useRef(handleRoundEnd);
   useEffect(() => {
@@ -453,6 +564,24 @@ export const App: React.FC = () => {
 
   // Bot Guesser Simulation
   const simulateBotGuesses = useCallback((secondsLeft: number) => {
+    if (roomConfig.mode === 'rush_draw') {
+      const currentList = playersRef.current;
+      currentList.forEach((bot) => {
+        if (bot.isBot) {
+          const unsolvedOpponents = currentList.filter(
+            (o) => o.id !== bot.id && !(bot.solvedOpponentIds || []).includes(o.id) && o.secretWord
+          );
+          if (unsolvedOpponents.length > 0 && Math.random() < 0.08) {
+            const targetOpp = unsolvedOpponents[Math.floor(Math.random() * unsolvedOpponents.length)];
+            const isAccurate = secondsLeft < (roomConfig.drawTime || 90) * 0.65 && Math.random() < 0.35;
+            const guess = getBotGuess(targetOpp.secretWord!, roomConfig.language, isAccurate);
+            handlePlayerGuessRef.current(bot, guess);
+          }
+        }
+      });
+      return;
+    }
+
     const word = currentWordRef.current;
     if (!word) return;
     const currentList = playersRef.current;
@@ -465,7 +594,7 @@ export const App: React.FC = () => {
         }
       }
     });
-  }, [roomConfig.drawTime, roomConfig.language]);
+  }, [roomConfig.drawTime, roomConfig.language, roomConfig.mode]);
 
   const simulateBotGuessesRef = useRef(simulateBotGuesses);
   useEffect(() => {
@@ -524,6 +653,155 @@ export const App: React.FC = () => {
   const handlePlayerGuess = (sender: Player, text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
+
+    if (roomConfig.mode === 'rush_draw') {
+      if (phase !== 'drawing') {
+        const msg: ChatMessage = {
+          id: `msg_${Date.now()}_${Math.random()}`,
+          playerId: sender.id,
+          playerName: sender.name,
+          avatar: sender.avatar,
+          text: trimmed,
+          type: 'chat',
+          timestamp: Date.now(),
+        };
+        setMessages((prev) => [...prev, msg]);
+        roomServiceRef.current?.broadcastChat(msg);
+        return;
+      }
+
+      // Anti-Spoiler: Don't leak your own secret word!
+      const myWord = sender.secretWord || (sender.id === currentUserId.current ? currentWordRef.current : '');
+      if (myWord && isWordMatch(trimmed, myWord)) {
+        const warningMsg: ChatMessage = {
+          id: `warn_${Date.now()}`,
+          playerId: sender.id,
+          playerName: sender.name,
+          text: '🤫 Đừng tiết lộ từ khóa bí mật của chính bạn!',
+          type: 'close',
+          timestamp: Date.now(),
+        };
+        setMessages((prev) => [...prev, warningMsg]);
+        return;
+      }
+
+      const currentPlayers = playersRef.current;
+      const senderPlayer = currentPlayers.find((p) => p.id === sender.id) || sender;
+      const alreadySolved = senderPlayer.solvedOpponentIds || [];
+
+      // Check match against any opponent's secret word
+      const matchedOpponent = currentPlayers.find((opp) => {
+        if (opp.id === sender.id) return false;
+        if (alreadySolved.includes(opp.id)) return false;
+        return opp.secretWord && isWordMatch(trimmed, opp.secretWord);
+      });
+
+      if (matchedOpponent && matchedOpponent.secretWord) {
+        soundManager.playCorrect();
+        const drawTimeTotal = roomConfig.drawTime || 90;
+        const points = Math.max(150, Math.round(150 + (timeLeft / drawTimeTotal) * 250));
+        const drawerBonus = 100;
+
+        const newSolvedList = [...alreadySolved, matchedOpponent.id];
+        const newDrawerSolvedBy = [...(matchedOpponent.solvedByPlayerIds || []), sender.id];
+
+        const updatedPlayers = currentPlayers.map((p) => {
+          if (p.id === sender.id) {
+            return {
+              ...p,
+              score: p.score + points,
+              solvedOpponentIds: newSolvedList,
+            };
+          }
+          if (p.id === matchedOpponent.id) {
+            return {
+              ...p,
+              score: p.score + drawerBonus,
+              solvedByPlayerIds: newDrawerSolvedBy,
+            };
+          }
+          return p;
+        });
+
+        setPlayers(updatedPlayers);
+        playersRef.current = updatedPlayers;
+        roomServiceRef.current?.broadcastGameState({
+          players: updatedPlayers,
+        });
+
+        const correctMsg: ChatMessage = {
+          id: `correct_${Date.now()}_${Math.random()}`,
+          playerId: sender.id,
+          playerName: sender.name,
+          avatar: sender.avatar,
+          text: `🎉 ${sender.name} đã giải mã thành công tranh của ${matchedOpponent.name}! (+${points}đ, ${matchedOpponent.name} +${drawerBonus}đ)`,
+          type: 'correct',
+          timestamp: Date.now(),
+        };
+        setMessages((prev) => [...prev, correctMsg]);
+        roomServiceRef.current?.broadcastChat(correctMsg);
+
+        // Check if sender has solved ALL opponents
+        const totalOpponents = currentPlayers.filter((p) => p.id !== sender.id).length;
+        if (newSolvedList.length >= totalOpponents && totalOpponents > 0) {
+          const finishMsg: ChatMessage = {
+            id: `finish_${Date.now()}`,
+            playerId: sender.id,
+            playerName: sender.name,
+            text: `🏆 Phù thủy ${sender.name} đã giải mã trọn vẹn TOÀN BỘ tranh của các đối thủ!`,
+            type: 'system',
+            timestamp: Date.now(),
+          };
+          setMessages((prev) => [...prev, finishMsg]);
+          roomServiceRef.current?.broadcastChat(finishMsg);
+
+          const everyoneFinished = updatedPlayers.every((p) => {
+            const oppCount = updatedPlayers.filter((o) => o.id !== p.id).length;
+            return (p.solvedOpponentIds?.length || 0) >= oppCount;
+          });
+          if (everyoneFinished) {
+            setTimeout(() => {
+              handleRoundEndRef.current();
+            }, 1000);
+          }
+        }
+        return;
+      }
+
+      // Check close match (Levenshtein)
+      for (const opp of currentPlayers) {
+        if (opp.id !== sender.id && !alreadySolved.includes(opp.id) && opp.secretWord) {
+          const dist = levenshteinDistance(trimmed, opp.secretWord);
+          if (dist > 0 && dist <= 2 && trimmed.length >= 3) {
+            soundManager.playClose();
+            const closeMsg: ChatMessage = {
+              id: `close_${Date.now()}`,
+              playerId: sender.id,
+              playerName: sender.name,
+              text: `⚡ ${sender.name}, bạn đoán gần trúng tranh của ${opp.name} rồi!`,
+              type: 'close',
+              timestamp: Date.now(),
+            };
+            setMessages((prev) => [...prev, closeMsg]);
+            return;
+          }
+        }
+      }
+
+      // Normal chat
+      const regularMsg: ChatMessage = {
+        id: `msg_${Date.now()}_${Math.random()}`,
+        playerId: sender.id,
+        playerName: sender.name,
+        avatar: sender.avatar,
+        text: trimmed,
+        type: 'chat',
+        timestamp: Date.now(),
+      };
+      setMessages((prev) => [...prev, regularMsg]);
+      roomServiceRef.current?.broadcastChat(regularMsg);
+      return;
+    }
 
     // If player is drawer or already guessed, treat as regular chat
     if (sender.isDrawer || sender.hasGuessed || phase !== 'drawing') {
@@ -686,7 +964,16 @@ export const App: React.FC = () => {
 
     // Initialize Realtime Network
     const service = new RealtimeRoomService(code, initialHost, {
-      onDrawAction: (action) => setIncomingDrawAction(action),
+      onDrawAction: (action) => {
+        if (action.drawerId && action.drawerId !== currentUserId.current) {
+          setOpponentDrawActions((prev) => ({
+            ...prev,
+            [action.drawerId!]: [...(prev[action.drawerId!] || []), action],
+          }));
+        } else {
+          setIncomingDrawAction(action);
+        }
+      },
       onChatMessage: (msg) => setMessages((prev) => [...prev, msg]),
       onGameStateSync: (syncState) => {
         if (syncState.phase) {
@@ -778,8 +1065,8 @@ export const App: React.FC = () => {
   const handleStartGame = () => {
     soundManager.playSpellVfx();
     let currentPlayers = players;
-    // For dual_coop or all_draw, auto-summon bots to ensure at least 3 players (at least 2 drawers + 1 guesser)
-    if ((roomConfig.mode === 'dual_coop' || roomConfig.mode === 'all_draw') && currentPlayers.length < 3) {
+    // For dual_coop, all_draw or rush_draw, auto-summon bots to ensure at least 3 players
+    if ((roomConfig.mode === 'dual_coop' || roomConfig.mode === 'all_draw' || roomConfig.mode === 'rush_draw') && currentPlayers.length < 3) {
       const needed = 3 - currentPlayers.length;
       const newBots: Player[] = [];
       for (let i = 0; i < needed; i++) {
@@ -791,7 +1078,7 @@ export const App: React.FC = () => {
       newBots.forEach((bot) => {
         const botJoinedMsg: ChatMessage = {
           id: `bot_join_${Date.now()}_${bot.id}`,
-          text: `🤖 ${bot.name} đã được triệu hồi để hỗ trợ chế độ Co-op!`,
+          text: `🤖 ${bot.name} đã được triệu hồi để cùng so tài phép thuật!`,
           type: 'system',
           timestamp: Date.now(),
         };
@@ -827,6 +1114,9 @@ export const App: React.FC = () => {
       clearTimeout(selectionTimeoutRef.current);
       selectionTimeoutRef.current = null;
     }
+    clearBotTimeouts();
+    setOpponentDrawActions({});
+    setInspectingPlayerId(null);
     roomServiceRef.current?.disconnect();
     roomServiceRef.current = null;
     setRoomCode(null);
@@ -844,6 +1134,9 @@ export const App: React.FC = () => {
       clearTimeout(selectionTimeoutRef.current);
       selectionTimeoutRef.current = null;
     }
+    clearBotTimeouts();
+    setOpponentDrawActions({});
+    setInspectingPlayerId(null);
 
     // Reset scores, guesses and drawer flags for all players in room
     const resetPlayers = playersRef.current.map((p) => ({
@@ -852,6 +1145,9 @@ export const App: React.FC = () => {
       hasGuessed: false,
       isDrawer: false,
       isLoneGuesser: false,
+      secretWord: undefined,
+      solvedOpponentIds: [],
+      solvedByPlayerIds: [],
     }));
 
     setPlayers(resetPlayers);
@@ -903,7 +1199,7 @@ export const App: React.FC = () => {
     if (phase !== 'drawing') {
       if (roundEndMessage) {
         return (
-          <div style={{ color: 'var(--hogwarts-gold)', fontSize: isMobile ? '13px' : '15px', fontWeight: 800 }} className="font-cinzel">
+          <div style={{ color: 'var(--hogwarts-gold)', fontSize: isMobile ? '13px' : '15px', fontWeight: 800, whiteSpace: 'pre-line' }} className="font-cinzel">
             {roundEndMessage}
           </div>
         );
@@ -911,6 +1207,56 @@ export const App: React.FC = () => {
       return (
         <div style={{ color: 'var(--text-muted)', fontSize: isMobile ? '12px' : '14px' }}>
           Đang chuẩn bị vòng đấu phép thuật...
+        </div>
+      );
+    }
+
+    if (roomConfig.mode === 'rush_draw') {
+      const myWord = currentWord || currentPlayer.secretWord;
+      const opps = players.filter((p) => p.id !== currentUserId.current);
+      const solvedCount = (currentPlayer.solvedOpponentIds || []).length;
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(116, 0, 1, 0.3)',
+              padding: isMobile ? '4px 10px' : '4px 14px',
+              borderRadius: '20px',
+              border: '1px solid var(--hogwarts-gold)',
+            }}
+          >
+            <span style={{ fontSize: '11px', color: 'var(--hogwarts-gold)', fontWeight: 700 }} className="font-cinzel">
+              BẠN VẼ:
+            </span>
+            <span
+              style={{ fontSize: isMobile ? '14px' : '17px', fontWeight: 900, color: '#fff' }}
+              className="font-cinzel"
+            >
+              {myWord || 'Đang chọn...'}
+            </span>
+          </div>
+
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(26, 71, 42, 0.3)',
+              padding: isMobile ? '4px 10px' : '4px 14px',
+              borderRadius: '20px',
+              border: '1px solid #4ade80',
+            }}
+          >
+            <span style={{ fontSize: '11px', color: '#4ade80', fontWeight: 700 }} className="font-cinzel">
+              ĐÃ ĐOÁN:
+            </span>
+            <span style={{ fontSize: isMobile ? '13px' : '15px', fontWeight: 800, color: '#fff' }}>
+              {solvedCount}/{opps.length} tranh
+            </span>
+          </div>
         </div>
       );
     }
@@ -986,7 +1332,15 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className={`game-container ${isMobile && phase !== 'lobby' && phase !== 'waiting_room' ? 'in-game-mobile' : ''}`}>
+    <div
+      className={`game-container ${
+        phase !== 'lobby' && phase !== 'waiting_room'
+          ? isMobile
+            ? 'in-game-mobile'
+            : 'in-game-desktop'
+          : ''
+      }`}
+    >
       {phase === 'lobby' || !roomCode ? (
         <Lobby
           playerName={playerName}
@@ -1044,6 +1398,8 @@ export const App: React.FC = () => {
                             ? 'Co-op'
                             : roomConfig.mode === 'all_draw'
                             ? 'Hợp Xướng'
+                            : roomConfig.mode === 'rush_draw'
+                            ? 'Đuổi Hình ⚡'
                             : 'Độc Hành'}
                         </span>
                       </div>
@@ -1123,6 +1479,8 @@ export const App: React.FC = () => {
                           ? 'Song Kiếm Co-op'
                           : roomConfig.mode === 'all_draw'
                           ? 'Đại Hợp Xướng'
+                          : roomConfig.mode === 'rush_draw'
+                          ? 'Đuổi Hình Bắt Chữ ⚡'
                           : 'Độc Hành'}
                       </span>
                     </div>
@@ -1179,8 +1537,17 @@ export const App: React.FC = () => {
                 className={`mobile-tab-btn ${mobileTab === 'canvas' ? 'active' : ''}`}
                 onClick={() => setMobileTab('canvas')}
               >
-                <Palette size={15} /> Bảng Vẽ
+                <Palette size={15} /> {roomConfig.mode === 'rush_draw' ? 'Bảng Của Tôi' : 'Bảng Vẽ'}
               </button>
+              {roomConfig.mode === 'rush_draw' && (
+                <button
+                  type="button"
+                  className={`mobile-tab-btn ${mobileTab === 'opponents' ? 'active' : ''}`}
+                  onClick={() => setMobileTab('opponents')}
+                >
+                  <Eye size={15} /> Soi Tranh ({players.filter((p) => p.id !== currentUserId.current).length})
+                </button>
+              )}
               <button
                 type="button"
                 className={`mobile-tab-btn ${mobileTab === 'chat' ? 'active' : ''}`}
@@ -1201,169 +1568,440 @@ export const App: React.FC = () => {
           {/* Main Content: Either Mobile Tab or Desktop 3-Column Grid */}
           {isMobile ? (
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-              {mobileTab === 'canvas' && (
-                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, gap: '8px' }}>
-                  <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                    <CanvasBoard
-                      isDrawer={isCurrentDrawer && phase === 'drawing'}
-                      onBroadcastDraw={(action) => roomServiceRef.current?.broadcastDraw(action)}
-                      incomingAction={incomingDrawAction}
-                      mode={roomConfig.mode}
-                      coopPartnerName={coopPartner?.name}
-                      isLoneGuesser={currentPlayer.isLoneGuesser}
-                      phase={phase}
-                      currentWord={currentWord}
-                      roundEndMessage={roundEndMessage}
-                    />
-                  </div>
+              {/* Mobile Tab 1: Canvas (Preserved in DOM so drawing is NEVER wiped) */}
+              <div
+                style={{
+                  display: mobileTab === 'canvas' ? 'flex' : 'none',
+                  flexDirection: 'column',
+                  flex: 1,
+                  minHeight: 0,
+                  height: '100%',
+                  gap: '8px',
+                }}
+              >
+                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                  <CanvasBoard
+                    isDrawer={roomConfig.mode === 'rush_draw' ? phase === 'drawing' : (isCurrentDrawer && phase === 'drawing')}
+                    onBroadcastDraw={(action) => {
+                      const tagged: DrawAction = { ...action, drawerId: currentUserId.current };
+                      if (roomConfig.mode === 'rush_draw') {
+                        setMyRushDrawActions((prev) => [...prev, tagged]);
+                      }
+                      roomServiceRef.current?.broadcastDraw(tagged);
+                    }}
+                    incomingAction={incomingDrawAction}
+                    mode={roomConfig.mode}
+                    coopPartnerName={coopPartner?.name}
+                    isLoneGuesser={currentPlayer.isLoneGuesser}
+                    phase={phase}
+                    currentWord={currentWord}
+                    roundEndMessage={roundEndMessage}
+                    initialActions={myRushDrawActions}
+                  />
+                </div>
 
-                  {/* Inline Quick Guess, Live Ticker & Reactions for Mobile Guessers right under canvas */}
-                  {!isCurrentDrawer && phase === 'drawing' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {/* Live Ticker: Shows 2 most recent guesses/results without leaving canvas */}
-                      {messages.length > 0 && (
-                        <div className="mobile-live-ticker-container">
-                          {messages.slice(-2).map((msg) => (
-                            <div
-                              key={msg.id}
-                              className={`mobile-live-ticker ${
-                                msg.type === 'correct' ? 'correct' : msg.type === 'close' ? 'close' : 'normal'
-                              }`}
-                            >
-                              {msg.type === 'correct' && <span>🎉</span>}
-                              {msg.type === 'close' && <span>⚠️</span>}
-                              {msg.type === 'system' && <span>🪄</span>}
-                              {msg.type === 'chat' && (
-                                <span style={{ color: 'var(--accent-yellow)', fontWeight: 700 }}>
-                                  {msg.playerName}:
-                                </span>
-                              )}
-                              <span>{msg.text}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Quick Emoji Reaction Pills */}
-                      <div className="mobile-quick-emojis">
-                        {['❤️', '😂', '👏', '🔥', '⚡', '🪄'].map((emoji) => (
-                          <button
-                            key={emoji}
-                            type="button"
-                            onClick={() => {
-                              soundManager.playToolSelect();
-                              handlePlayerGuess(currentPlayer, emoji);
-                            }}
-                            className="mobile-emoji-pill"
-                            title={`Thả cảm xúc ${emoji}`}
+                {/* Opponent Mini Thumbnails Strip on Mobile (Only if toggled ON) */}
+                {showMiniOpponentsStrip && roomConfig.mode === 'rush_draw' && phase === 'drawing' && (
+                  <div className="rush-thumbnail-strip" style={{ padding: '2px 0' }}>
+                    {players
+                      .filter((p) => p.id !== currentUserId.current)
+                      .map((opp) => {
+                        const isSolved = (currentPlayer.solvedOpponentIds || []).includes(opp.id);
+                        return (
+                          <div
+                            key={opp.id}
+                            style={{ width: '110px', flexShrink: 0, cursor: 'pointer' }}
+                            onClick={() => setInspectingPlayerId(opp.id)}
+                            title={`Click để phóng to soi tranh của ${opp.name}`}
                           >
-                            {emoji}
-                          </button>
+                            <MiniCanvasBoard
+                              actions={opponentDrawActions[opp.id] || []}
+                              playerName={opp.name}
+                              avatarColor={opp.avatar.color}
+                              isSolved={isSolved}
+                              solvedWord={isSolved ? opp.secretWord : undefined}
+                            />
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+
+                {/* Inline Quick Guess, Live Ticker & Reactions for Mobile Guessers (only in modes where player is NOT the drawer) */}
+                {roomConfig.mode !== 'rush_draw' && !isCurrentDrawer && phase === 'drawing' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {/* Live Ticker: Shows 2 most recent guesses/results without leaving canvas */}
+                    {messages.length > 0 && (
+                      <div className="mobile-live-ticker-container">
+                        {messages.slice(-2).map((msg) => (
+                          <div
+                            key={msg.id}
+                            className={`mobile-live-ticker ${
+                              msg.type === 'correct' ? 'correct' : msg.type === 'close' ? 'close' : 'normal'
+                            }`}
+                          >
+                            {msg.type === 'correct' && <span>🎉</span>}
+                            {msg.type === 'close' && <span>⚠️</span>}
+                            {msg.type === 'system' && <span>🪄</span>}
+                            {msg.type === 'chat' && (
+                              <span style={{ color: 'var(--accent-yellow)', fontWeight: 700 }}>
+                                {msg.playerName}:
+                              </span>
+                            )}
+                            <span>{msg.text}</span>
+                          </div>
                         ))}
                       </div>
+                    )}
 
-                      {/* Guess Input Form */}
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          if (!mobileGuessInput.trim()) return;
-                          soundManager.playClick();
-                          handlePlayerGuess(currentPlayer, mobileGuessInput.trim());
-                          setMobileGuessInput('');
-                        }}
-                        style={{
-                          background: 'var(--bg-card)',
-                          border: '2px solid var(--border-card)',
-                          borderRadius: '14px',
-                          padding: '6px 8px',
-                          display: 'flex',
-                          gap: '6px',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={mobileGuessInput}
-                          onChange={(e) => setMobileGuessInput(e.target.value)}
-                          placeholder={currentPlayer.hasGuessed ? 'Đã đoán đúng! Chat tự do...' : 'Gõ tên bảo bối ma thuật...'}
-                          style={{ flex: 1, padding: '10px 12px', fontSize: '16px' }}
-                        />
+                    {/* Quick Emoji Reaction Pills */}
+                    <div className="mobile-quick-emojis">
+                      {['❤️', '😂', '👏', '🔥', '⚡', '🪄'].map((emoji) => (
                         <button
-                          type="submit"
-                          disabled={!mobileGuessInput.trim()}
-                          className="btn-gold"
-                          style={{ padding: '0 16px', minHeight: '42px', borderRadius: '10px' }}
+                          key={emoji}
+                          type="button"
+                          onClick={() => {
+                            soundManager.playToolSelect();
+                            handlePlayerGuess(currentPlayer, emoji);
+                          }}
+                          className="mobile-emoji-pill"
+                          title={`Thả cảm xúc ${emoji}`}
                         >
-                          <Send size={16} />
+                          {emoji}
                         </button>
-                      </form>
+                      ))}
                     </div>
-                  )}
+
+                    {/* Guess Input Form */}
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!mobileGuessInput.trim()) return;
+                        soundManager.playClick();
+                        handlePlayerGuess(currentPlayer, mobileGuessInput.trim());
+                        setMobileGuessInput('');
+                      }}
+                      style={{
+                        background: 'var(--bg-card)',
+                        border: '2px solid var(--border-card)',
+                        borderRadius: '14px',
+                        padding: '6px 8px',
+                        display: 'flex',
+                        gap: '6px',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <input
+                        type="text"
+                        value={mobileGuessInput}
+                        onChange={(e) => setMobileGuessInput(e.target.value)}
+                        placeholder={currentPlayer.hasGuessed ? 'Đã đoán đúng! Chat tự do...' : 'Gõ tên bảo bối ma thuật...'}
+                        style={{ flex: 1, padding: '10px 12px', fontSize: '16px' }}
+                      />
+                      <button
+                        type="submit"
+                        disabled={!mobileGuessInput.trim()}
+                        className="btn-gold"
+                        style={{ padding: '0 16px', minHeight: '42px', borderRadius: '10px' }}
+                      >
+                        <Send size={16} />
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </div>
+
+              {/* Mobile Tab 2: Opponents Live Drawings (Preserved in DOM) */}
+              {roomConfig.mode === 'rush_draw' && (
+                <div
+                  style={{
+                    display: mobileTab === 'opponents' ? 'flex' : 'none',
+                    flex: 1,
+                    minHeight: 0,
+                    height: '100%',
+                    flexDirection: 'column',
+                    position: 'relative',
+                  }}
+                >
+                  <div className="rush-opponents-grid">
+                    {players
+                      .filter((p) => p.id !== currentUserId.current)
+                      .map((opp) => {
+                        const isSolved = (currentPlayer.solvedOpponentIds || []).includes(opp.id);
+                        return (
+                          <div
+                            key={opp.id}
+                            onClick={() => setInspectingPlayerId(opp.id)}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <MiniCanvasBoard
+                              actions={opponentDrawActions[opp.id] || []}
+                              playerName={opp.name}
+                              avatarColor={opp.avatar.color}
+                              isSolved={isSolved}
+                              solvedWord={isSolved ? opp.secretWord : undefined}
+                              onInspect={() => setInspectingPlayerId(opp.id)}
+                            />
+                          </div>
+                        );
+                      })}
+                  </div>
+
+                  {/* Mobile Quick Guess Dock Bar */}
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!mobileGuessInput.trim()) return;
+                      soundManager.playClick();
+                      handlePlayerGuess(currentPlayer, mobileGuessInput.trim());
+                      setMobileGuessInput('');
+                    }}
+                    className="mobile-rush-quick-guess-dock"
+                  >
+                    <input
+                      type="text"
+                      value={mobileGuessInput}
+                      onChange={(e) => setMobileGuessInput(e.target.value)}
+                      placeholder="Gõ tên bảo bối để giải mã tranh..."
+                      style={{ flex: 1, padding: '10px 14px', fontSize: '15px' }}
+                    />
+                    <button
+                      type="submit"
+                      disabled={!mobileGuessInput.trim()}
+                      className="btn-primary"
+                      style={{ padding: '0 16px', borderRadius: '10px' }}
+                    >
+                      <Send size={16} />
+                    </button>
+                  </form>
                 </div>
               )}
 
-              {mobileTab === 'chat' && (
-                <div style={{ flex: 1, minHeight: 0, height: '100%', overflow: 'hidden' }}>
-                  <ChatPanel
-                    messages={messages}
-                    onSendMessage={(text) => handlePlayerGuess(currentPlayer, text)}
-                    isDrawer={isCurrentDrawer && phase === 'drawing'}
-                    hasGuessed={currentPlayer.hasGuessed}
-                    currentPlayer={currentPlayer}
-                  />
-                </div>
-              )}
+              {/* Mobile Tab 3: Chat Panel (Preserved in DOM) */}
+              <div
+                style={{
+                  display: mobileTab === 'chat' ? 'flex' : 'none',
+                  flex: 1,
+                  minHeight: 0,
+                  height: '100%',
+                  overflow: 'hidden',
+                }}
+              >
+                <ChatPanel
+                  messages={messages}
+                  onSendMessage={(text) => handlePlayerGuess(currentPlayer, text)}
+                  isDrawer={roomConfig.mode === 'rush_draw' ? false : (isCurrentDrawer && phase === 'drawing')}
+                  hasGuessed={currentPlayer.hasGuessed}
+                  currentPlayer={currentPlayer}
+                  mode={roomConfig.mode}
+                />
+              </div>
 
-              {mobileTab === 'scores' && (
-                <div style={{ flex: 1, minHeight: 0, height: '100%', overflow: 'hidden' }}>
-                  <ScoreBoard
-                    players={players}
-                    currentUserId={currentUserId.current}
-                    currentDrawerId={currentDrawer?.id || null}
-                    roomCode={roomConfig.roomCode}
-                    round={round}
-                    totalRounds={roomConfig.totalRounds}
-                    isHost={isHost}
-                    onAddBot={handleAddBot}
-                    mode={roomConfig.mode}
-                  />
-                </div>
-              )}
+              {/* Mobile Tab 4: Score Board (Preserved in DOM) */}
+              <div
+                style={{
+                  display: mobileTab === 'scores' ? 'flex' : 'none',
+                  flex: 1,
+                  minHeight: 0,
+                  height: '100%',
+                  overflow: 'hidden',
+                }}
+              >
+                <ScoreBoard
+                  players={players}
+                  currentUserId={currentUserId.current}
+                  currentDrawerId={currentDrawer?.id || null}
+                  roomCode={roomConfig.roomCode}
+                  round={round}
+                  totalRounds={roomConfig.totalRounds}
+                  isHost={isHost}
+                  onAddBot={handleAddBot}
+                  mode={roomConfig.mode}
+                />
+              </div>
             </div>
           ) : (
-            <div className="game-main-grid">
-              <ScoreBoard
-                players={players}
-                currentUserId={currentUserId.current}
-                currentDrawerId={currentDrawer?.id || null}
-                roomCode={roomConfig.roomCode}
-                round={round}
-                totalRounds={roomConfig.totalRounds}
-                isHost={isHost}
-                onAddBot={handleAddBot}
-                mode={roomConfig.mode}
-              />
+            <div className={`game-main-grid ${roomConfig.mode === 'rush_draw' ? 'rush-mode' : ''} ${isCanvasMaximized ? 'canvas-maximized' : ''}`}>
+              {!isCanvasMaximized && (
+                <ScoreBoard
+                  players={players}
+                  currentUserId={currentUserId.current}
+                  currentDrawerId={currentDrawer?.id || null}
+                  roomCode={roomConfig.roomCode}
+                  round={round}
+                  totalRounds={roomConfig.totalRounds}
+                  isHost={isHost}
+                  onAddBot={handleAddBot}
+                  mode={roomConfig.mode}
+                />
+              )}
 
-              <CanvasBoard
-                isDrawer={isCurrentDrawer && phase === 'drawing'}
-                onBroadcastDraw={(action) => roomServiceRef.current?.broadcastDraw(action)}
-                incomingAction={incomingDrawAction}
-                mode={roomConfig.mode}
-                coopPartnerName={coopPartner?.name}
-                isLoneGuesser={currentPlayer.isLoneGuesser}
-                phase={phase}
-                currentWord={currentWord}
-                roundEndMessage={roundEndMessage}
-              />
+              {roomConfig.mode === 'rush_draw' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden' }}>
+                  <div className="rush-view-switcher">
+                    <button
+                      type="button"
+                      className={`rush-view-btn ${rushViewTab === 'my_board' ? 'active' : ''}`}
+                      onClick={() => setRushViewTab('my_board')}
+                    >
+                      <Palette size={14} /> Bảng Vẽ Của Tôi ✏️
+                    </button>
+                    <button
+                      type="button"
+                      className={`rush-view-btn ${rushViewTab === 'opponents' ? 'active' : ''}`}
+                      onClick={() => setRushViewTab('opponents')}
+                    >
+                      <Eye size={14} /> Soi Tranh Đối Thủ 👁️ ({players.filter((p) => p.id !== currentUserId.current).length})
+                    </button>
+
+                    {rushViewTab === 'my_board' && (
+                      <button
+                        type="button"
+                        className="rush-view-btn"
+                        style={{
+                          marginLeft: 'auto',
+                          fontSize: '11px',
+                          padding: '3px 8px',
+                          color: showMiniOpponentsStrip ? 'var(--hogwarts-gold)' : 'var(--text-muted)',
+                          border: showMiniOpponentsStrip ? '1px solid var(--border-gold)' : '1px solid transparent',
+                        }}
+                        onClick={() => setShowMiniOpponentsStrip(!showMiniOpponentsStrip)}
+                        title="Bật/tắt dải tranh mini bên dưới khung vẽ"
+                      >
+                        {showMiniOpponentsStrip ? '👁️ Ẩn dải tranh mini' : '👁️ Dải tranh mini'}
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      className="rush-view-btn"
+                      style={{
+                        marginLeft: rushViewTab !== 'my_board' ? 'auto' : '4px',
+                        fontSize: '11px',
+                        padding: '3px 8px',
+                        color: isCanvasMaximized ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                        background: isCanvasMaximized ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+                        border: isCanvasMaximized ? '1px solid var(--accent-cyan)' : '1px solid rgba(255,255,255,0.1)',
+                      }}
+                      onClick={() => setIsCanvasMaximized(!isCanvasMaximized)}
+                      title={isCanvasMaximized ? 'Thu nhỏ bảng vẽ lại bình thường (hiện bảng điểm)' : 'Phóng to tối đa khung vẽ (ẩn bảng điểm)'}
+                    >
+                      {isCanvasMaximized ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+                      <span>{isCanvasMaximized ? 'Thu Nhỏ' : 'Phóng To'}</span>
+                    </button>
+                  </div>
+
+                  {/* My Board View (Preserved in DOM so drawing is NEVER wiped) */}
+                  <div
+                    style={{
+                      display: rushViewTab === 'my_board' ? 'flex' : 'none',
+                      flexDirection: 'column',
+                      flex: 1,
+                      minHeight: 0,
+                      height: '100%',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
+                      <CanvasBoard
+                        isDrawer={phase === 'drawing'}
+                        onBroadcastDraw={(action) => {
+                          const tagged: DrawAction = { ...action, drawerId: currentUserId.current };
+                          setMyRushDrawActions((prev) => [...prev, tagged]);
+                          roomServiceRef.current?.broadcastDraw(tagged);
+                        }}
+                        incomingAction={incomingDrawAction}
+                        mode={roomConfig.mode}
+                        coopPartnerName={coopPartner?.name}
+                        isLoneGuesser={false}
+                        phase={phase}
+                        currentWord={currentWord}
+                        roundEndMessage={roundEndMessage}
+                        initialActions={myRushDrawActions}
+                      />
+                    </div>
+
+                    {/* Opponent Mini Thumbnails Strip (Only when toggled ON) */}
+                    {showMiniOpponentsStrip && (
+                      <div className="rush-thumbnail-strip">
+                        {players
+                          .filter((p) => p.id !== currentUserId.current)
+                          .map((opp) => {
+                            const isSolved = (currentPlayer.solvedOpponentIds || []).includes(opp.id);
+                            return (
+                              <div
+                                key={opp.id}
+                                style={{ width: '135px', flexShrink: 0, cursor: 'pointer' }}
+                                onClick={() => setInspectingPlayerId(opp.id)}
+                                title={`Click để phóng to soi tranh của ${opp.name}`}
+                              >
+                                <MiniCanvasBoard
+                                  actions={opponentDrawActions[opp.id] || []}
+                                  playerName={opp.name}
+                                  avatarColor={opp.avatar.color}
+                                  isSolved={isSolved}
+                                  solvedWord={isSolved ? opp.secretWord : undefined}
+                                />
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Opponents Multi-Board Grid (Preserved in DOM) */}
+                  <div
+                    className="rush-opponents-grid"
+                    style={{
+                      display: rushViewTab === 'opponents' ? 'grid' : 'none',
+                    }}
+                  >
+                    {players
+                      .filter((p) => p.id !== currentUserId.current)
+                      .map((opp) => {
+                        const isSolved = (currentPlayer.solvedOpponentIds || []).includes(opp.id);
+                        return (
+                          <div
+                            key={opp.id}
+                            onClick={() => setInspectingPlayerId(opp.id)}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <MiniCanvasBoard
+                              actions={opponentDrawActions[opp.id] || []}
+                              playerName={opp.name}
+                              avatarColor={opp.avatar.color}
+                              isSolved={isSolved}
+                              solvedWord={isSolved ? opp.secretWord : undefined}
+                              onInspect={() => setInspectingPlayerId(opp.id)}
+                            />
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              ) : (
+                <CanvasBoard
+                  isDrawer={isCurrentDrawer && phase === 'drawing'}
+                  onBroadcastDraw={(action) => roomServiceRef.current?.broadcastDraw(action)}
+                  incomingAction={incomingDrawAction}
+                  mode={roomConfig.mode}
+                  coopPartnerName={coopPartner?.name}
+                  isLoneGuesser={currentPlayer.isLoneGuesser}
+                  phase={phase}
+                  currentWord={currentWord}
+                  roundEndMessage={roundEndMessage}
+                />
+              )}
 
               <div className="right-panel-column">
                 <div id="drawing-toolbar-container" />
                 <ChatPanel
                   messages={messages}
                   onSendMessage={(text) => handlePlayerGuess(currentPlayer, text)}
-                  isDrawer={isCurrentDrawer && phase === 'drawing'}
+                  isDrawer={roomConfig.mode === 'rush_draw' ? false : (isCurrentDrawer && phase === 'drawing')}
                   hasGuessed={currentPlayer.hasGuessed}
                   currentPlayer={currentPlayer}
+                  mode={roomConfig.mode}
                 />
               </div>
             </div>
@@ -1372,9 +2010,11 @@ export const App: React.FC = () => {
           {/* Word Selection Modal */}
           {phase === 'selecting_word' && (
             <WordPickerModal
-              isDrawer={isCurrentDrawer}
+              isDrawer={roomConfig.mode === 'rush_draw' ? true : isCurrentDrawer}
               drawerName={
-                roomConfig.mode === 'dual_coop'
+                roomConfig.mode === 'rush_draw'
+                  ? `${currentPlayer?.name || 'Bạn'} (Đuổi Hình Bắt Chữ)`
+                  : roomConfig.mode === 'dual_coop'
                   ? players.filter((p) => p.isDrawer).map((p) => p.name).join(' & ') || 'Hai Pháp Sư'
                   : roomConfig.mode === 'all_draw'
                   ? 'Toàn Thể Pháp Sư'
@@ -1385,6 +2025,23 @@ export const App: React.FC = () => {
               onTimeout={handleSkipDrawer}
             />
           )}
+
+          {/* Inspect Opponent Board Modal */}
+          {inspectingPlayerId && (() => {
+            const opp = players.find((p) => p.id === inspectingPlayerId);
+            if (!opp) return null;
+            const isSolved = (currentPlayer.solvedOpponentIds || []).includes(opp.id);
+            return (
+              <InspectBoardModal
+                opponent={opp}
+                actions={opponentDrawActions[opp.id] || []}
+                isSolved={isSolved}
+                solvedWord={isSolved ? opp.secretWord : undefined}
+                onClose={() => setInspectingPlayerId(null)}
+                onGuess={(text) => handlePlayerGuess(currentPlayer, text)}
+              />
+            );
+          })()}
 
           {/* Victory Podium */}
           {phase === 'game_over' && (

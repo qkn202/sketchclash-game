@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { AvatarConfig, RoomConfig } from '../types';
+import type { AvatarConfig, RoomConfig, GameMode } from '../types';
 import { AvatarPicker } from './AvatarPicker';
 import { Wand2, Play, Plus, LogIn, Bot, Volume2, VolumeX, Sparkles, Settings2, Scroll } from 'lucide-react';
 import { soundManager } from '../utils/audio';
@@ -23,6 +23,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [isMuted, setIsMuted] = useState(soundManager.isMuted());
 
+  const [mode, setMode] = useState<GameMode>('classic');
   const [drawTime, setDrawTime] = useState<number>(60);
   const [totalRounds, setTotalRounds] = useState<number>(3);
   const [language, setLanguage] = useState<'vi' | 'en'>('vi');
@@ -32,6 +33,7 @@ export const Lobby: React.FC<LobbyProps> = ({
     const muted = soundManager.toggleMute();
     setIsMuted(muted);
   };
+
 
   const handleQuickPlay = () => {
     if (!playerName.trim()) return;
@@ -61,6 +63,7 @@ export const Lobby: React.FC<LobbyProps> = ({
       .filter((w) => w.length > 0);
 
     onJoinRoom(randomCode, {
+      mode,
       drawTime,
       totalRounds,
       language,
@@ -209,6 +212,7 @@ export const Lobby: React.FC<LobbyProps> = ({
               <Bot size={20} /> Luyện Tập Cùng Học Sinh Hogwarts (AI Bots)
             </button>
 
+
             {/* Custom Room */}
             <button
               type="button"
@@ -307,6 +311,22 @@ export const Lobby: React.FC<LobbyProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
               <div>
                 <label style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                  Chế độ thi đấu ma thuật:
+                </label>
+                <select
+                  value={mode}
+                  onChange={(e) => setMode(e.target.value as GameMode)}
+                  style={{ width: '100%', fontWeight: 700 }}
+                >
+                  <option value="classic">🪄 Độc Hành Phép Thuật (1 người vẽ - Cả phòng đoán)</option>
+                  <option value="dual_coop">🤝 Song Kiếm Hợp Bích (Co-op 2 người cùng vẽ)</option>
+                  <option value="all_draw">🎭 Đại Hợp Xướng (Tất cả vẽ - 1 người đoán)</option>
+                  <option value="rush_draw">⚡ Đuổi Hình Bắt Chữ (Tất cả vừa vẽ vừa đoán đồng thời)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
                   Thời gian niệm phép mỗi vòng:
                 </label>
                 <select
@@ -317,6 +337,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                   <option value={45}>45 giây</option>
                   <option value={60}>60 giây (Mặc định)</option>
                   <option value={80}>80 giây</option>
+                  <option value={90}>90 giây (Khuyên dùng cho Đuổi Hình Bắt Chữ)</option>
                   <option value={100}>100 giây</option>
                 </select>
               </div>

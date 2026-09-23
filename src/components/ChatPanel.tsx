@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import type { ChatMessage, Player } from '../types';
+import type { ChatMessage, Player, GameMode } from '../types';
 import { Send, Smile } from 'lucide-react';
 import { soundManager } from '../utils/audio';
 
@@ -11,6 +11,7 @@ interface ChatPanelProps {
   isDrawer: boolean;
   hasGuessed: boolean;
   currentPlayer: Player;
+  mode?: GameMode;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -19,6 +20,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   isDrawer,
   hasGuessed,
   currentPlayer,
+  mode,
 }) => {
   const [inputVal, setInputVal] = useState('');
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
@@ -226,18 +228,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           value={inputVal}
           onChange={(e) => setInputVal(e.target.value)}
           placeholder={
-            isDrawer
+            mode === 'rush_draw'
+              ? 'Gõ dự đoán bảo bối của bất kỳ đối thủ nào...'
+              : isDrawer
               ? 'Bạn đang vẽ, không thể đoán!'
               : hasGuessed
               ? 'Bạn đã đoán trúng! Trò chuyện tự do...'
               : 'Gõ dự đoán của bạn...'
           }
-          disabled={isDrawer}
+          disabled={mode === 'rush_draw' ? false : isDrawer}
           style={{ flex: 1, padding: '8px 12px', fontSize: '16px' }}
         />
         <button
           type="submit"
-          disabled={isDrawer || !inputVal.trim()}
+          disabled={(mode === 'rush_draw' ? false : isDrawer) || !inputVal.trim()}
           className="btn-primary"
           style={{ padding: '0 14px', minHeight: '40px', borderRadius: '12px' }}
         >

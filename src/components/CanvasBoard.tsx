@@ -30,6 +30,7 @@ interface CanvasBoardProps {
   phase?: GamePhase;
   currentWord?: string;
   roundEndMessage?: string | null;
+  initialActions?: DrawAction[];
 }
 
 export const CanvasBoard: React.FC<CanvasBoardProps> = ({
@@ -42,6 +43,7 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
   phase = 'drawing',
   currentWord = '',
   roundEndMessage = null,
+  initialActions,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [tool, setTool] = useState<ToolType>('brush');
@@ -54,40 +56,70 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
   const isDrawing = useRef<boolean>(false);
   const currentStroke = useRef<DrawStroke | null>(null);
 
-  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const [boardDimensions, setBoardDimensions] = useState<{ width: number; height: number } | null>(null);
+
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+
+    const updateDimensions = () => {
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return; // Do not resize if hidden (display: none)
+      const availW = Math.max(100, Math.floor(rect.width));
+      const availH = Math.max(100, Math.floor(rect.height));
+
+      // Strictly fit within available space with 16:10 aspect ratio
+      let w = availW;
+      let h = Math.floor(w / 1.6);
+      if (h > availH) {
+        h = availH;
+        w = Math.floor(h * 1.6);
+      }
+      setBoardDimensions({ width: w, height: h });
+    };
+
+    updateDimensions();
+
+    const ro = new ResizeObserver(() => {
+      updateDimensions();
+    });
+    ro.observe(el);
+
+    window.addEventListener('resize', updateDimensions);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', updateDimensions);
+    };
+  }, []);
+
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(() => {
+    return typeof document !== 'undefined' ? document.getElementById('drawing-toolbar-container') : null;
+  });
 
   useEffect(() => {
     const updateTarget = () => {
-      setPortalTarget(document.getElementById('drawing-toolbar-container'));
+      const el = document.getElementById('drawing-toolbar-container');
+      if (el) setPortalTarget(el);
     };
     updateTarget();
-    const t = setTimeout(updateTarget, 100);
-    return () => clearTimeout(t);
+    const t1 = setTimeout(updateTarget, 50);
+    const t2 = setTimeout(updateTarget, 200);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
   }, []);
 
   // Logical resolution
   const LOGICAL_WIDTH = 800;
   const LOGICAL_HEIGHT = 500;
 
-  // Initialize Canvas
-  const initCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return;
-
-    // Classic magical parchment tone
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
-
-    const baseSnapshot = ctx.getImageData(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
-    setUndoStack([baseSnapshot]);
-    setRedoStack([]);
-  }, []);
-
+  // Track initialActions in ref so we don't trigger re-init on every stroke
+  const initialActionsRef = useRef(initialActions);
   useEffect(() => {
-    initCanvas();
-  }, [initCanvas]);
+    initialActionsRef.current = initialActions;
+  }, [initialActions]);
 
   const pushUndoState = () => {
     const canvas = canvasRef.current;
@@ -252,6 +284,40 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
   }, []);
+
+  // Initialize Canvas and restore previous drawing if present
+  const initCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return;
+
+    // Classic magical parchment tone
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+
+    // If pre-existing actions exist, restore them
+    const actionsToReplay = initialActionsRef.current;
+    if (actionsToReplay && actionsToReplay.length > 0) {
+      actionsToReplay.forEach((act) => {
+        if (act.type === 'stroke' && act.stroke) {
+          renderStroke(act.stroke);
+        } else if (act.type === 'fill' && act.fill) {
+          renderFill(act.fill.x, act.fill.y, act.fill.color);
+        } else if (act.type === 'clear') {
+          clearBoard();
+        }
+      });
+    }
+
+    const baseSnapshot = ctx.getImageData(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+    setUndoStack([baseSnapshot]);
+    setRedoStack([]);
+  }, [renderStroke, renderFill, clearBoard]);
+
+  useEffect(() => {
+    initCanvas();
+  }, [initCanvas]);
 
   useEffect(() => {
     if (!incomingAction) return;
@@ -712,9 +778,16 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
   ) : null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', minHeight: 0, gap: '8px' }}>
+    <div ref={wrapperRef} className="canvas-board-wrapper">
       {/* Hogwarts Magic Parchment Canvas */}
-      <div className="canvas-parchment-container">
+      <div
+        className="canvas-parchment-container"
+        style={
+          boardDimensions
+            ? { width: `${boardDimensions.width}px`, height: `${boardDimensions.height}px` }
+            : undefined
+        }
+      >
         <canvas
           ref={canvasRef}
           width={LOGICAL_WIDTH}

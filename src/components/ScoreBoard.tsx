@@ -207,7 +207,25 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                   </span>
 
                   {/* Status Badge */}
-                  {isDrawer ? (
+                  {mode === 'rush_draw' ? (
+                    <span
+                      style={{
+                        fontSize: '10px',
+                        background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.3) 0%, rgba(124, 58, 237, 0.4) 100%)',
+                        color: '#ffd875',
+                        border: '1px solid var(--border-gold)',
+                        fontWeight: 800,
+                        padding: '2px 6px',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                      }}
+                      className="font-cinzel"
+                    >
+                      ⚡ {(player.solvedOpponentIds || []).length}/{Math.max(1, players.length - 1)}
+                    </span>
+                  ) : isDrawer ? (
                     <span
                       style={{
                         fontSize: '10px',

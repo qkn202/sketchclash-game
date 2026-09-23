@@ -9,7 +9,7 @@ export interface AvatarConfig {
   accessory: AccessoryType;
 }
 
-export type GameMode = 'classic' | 'dual_coop' | 'all_draw';
+export type GameMode = 'classic' | 'dual_coop' | 'all_draw' | 'rush_draw';
 
 export interface Player {
   id: string;
@@ -22,6 +22,10 @@ export interface Player {
   isBot?: boolean;
   roundScore?: number;
   isLoneGuesser?: boolean;
+  secretWord?: string;
+  wordChoices?: string[];
+  solvedOpponentIds?: string[];
+  solvedByPlayerIds?: string[];
 }
 
 export type ToolType = 'brush' | 'fire' | 'ice' | 'sparkle' | 'bucket' | 'eraser';
@@ -49,6 +53,7 @@ export interface DrawAction {
   type: 'stroke' | 'fill' | 'clear';
   stroke?: DrawStroke;
   fill?: DrawFill;
+  drawerId?: string;
 }
 
 export interface RoomConfig {
@@ -89,5 +94,6 @@ export interface GameState {
   wordChoices: string[];
   revealedIndices: number[];
   players: Player[];
+  playerWords?: Record<string, string>;
   winner: Player | null;
 }
