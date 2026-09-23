@@ -14,13 +14,33 @@ export const BOT_PRESETS: BotPreset[] = [
   { name: 'Ron Weasley', avatarColor: '#d3a625', eyes: 'happy', mouth: 'grin', accessory: 'none' },
   { name: 'Draco Malfoy', avatarColor: '#1a472a', eyes: 'cool', mouth: 'smile', accessory: 'none' },
   { name: 'Cụ Dumbledore', avatarColor: '#ffd875', eyes: 'wink', mouth: 'smile', accessory: 'mustache' },
+  { name: 'Harry Potter', avatarColor: '#991b1b', eyes: 'cool', mouth: 'smile', accessory: 'glasses' },
+  { name: 'Luna Lovegood', avatarColor: '#38bdf8', eyes: 'star', mouth: 'smile', accessory: 'hat' },
+  { name: 'Giáo Sư Snape', avatarColor: '#0e1a40', eyes: 'cool', mouth: 'smile', accessory: 'none' },
+  { name: 'Giáo Sư McGonagall', avatarColor: '#740001', eyes: 'happy', mouth: 'smile', accessory: 'hat' },
+  { name: 'Rubeus Hagrid', avatarColor: '#4b2e16', eyes: 'happy', mouth: 'grin', accessory: 'mustache' },
+  { name: 'Sirius Black', avatarColor: '#1e293b', eyes: 'cool', mouth: 'smile', accessory: 'none' },
+  { name: 'Remus Lupin', avatarColor: '#d97706', eyes: 'wink', mouth: 'smile', accessory: 'none' },
+  { name: 'Neville Longbottom', avatarColor: '#15803d', eyes: 'happy', mouth: 'smile', accessory: 'none' },
+  { name: 'Ginny Weasley', avatarColor: '#f43f5e', eyes: 'star', mouth: 'grin', accessory: 'none' },
+  { name: 'Fred Weasley', avatarColor: '#d97706', eyes: 'wink', mouth: 'tongue', accessory: 'none' },
+  { name: 'George Weasley', avatarColor: '#d97706', eyes: 'cool', mouth: 'tongue', accessory: 'none' },
+  { name: 'Cho Chang', avatarColor: '#1d4ed8', eyes: 'happy', mouth: 'smile', accessory: 'none' },
+  { name: 'Cedric Diggory', avatarColor: '#ffd875', eyes: 'cool', mouth: 'smile', accessory: 'crown' },
+  { name: 'Bellatrix Lestrange', avatarColor: '#4a154b', eyes: 'cool', mouth: 'grin', accessory: 'none' },
+  { name: 'Chúa Tể Voldemort', avatarColor: '#042f2e', eyes: 'cool', mouth: 'smile', accessory: 'none' },
+  { name: 'Gia Tinh Dobby', avatarColor: '#faedcd', eyes: 'star', mouth: 'smile', accessory: 'none' },
 ];
 
 export function createBotPlayer(index: number = 0): Player {
-  const preset = BOT_PRESETS[index % BOT_PRESETS.length];
+  const presetIndex = index % BOT_PRESETS.length;
+  const preset = BOT_PRESETS[presetIndex];
+  const cycle = Math.floor(index / BOT_PRESETS.length);
+  const botName = cycle > 0 ? `${preset.name} #${cycle + 1}` : preset.name;
+
   return {
     id: `bot_wizard_${Date.now()}_${index}`,
-    name: preset.name,
+    name: botName,
     avatar: {
       color: preset.avatarColor,
       eyes: preset.eyes,

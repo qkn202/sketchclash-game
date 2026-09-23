@@ -26,6 +26,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [mode, setMode] = useState<GameMode>('classic');
   const [drawTime, setDrawTime] = useState<number>(60);
   const [totalRounds, setTotalRounds] = useState<number>(3);
+  const [maxPlayers, setMaxPlayers] = useState<number>(20);
   const [language, setLanguage] = useState<'vi' | 'en'>('vi');
   const [customWordsText, setCustomWordsText] = useState('');
 
@@ -66,6 +67,7 @@ export const Lobby: React.FC<LobbyProps> = ({
       mode,
       drawTime,
       totalRounds,
+      maxPlayers,
       language,
       customWords,
     }, false, true);
@@ -355,6 +357,22 @@ export const Lobby: React.FC<LobbyProps> = ({
                   <option value={3}>3 vòng (Mặc định)</option>
                   <option value={5}>5 vòng</option>
                   <option value={8}>8 vòng</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                  Số lượng phù thủy tối đa:
+                </label>
+                <select
+                  value={maxPlayers}
+                  onChange={(e) => setMaxPlayers(Number(e.target.value))}
+                  style={{ width: '100%', fontWeight: 700 }}
+                >
+                  <option value={8}>8 phù thủy</option>
+                  <option value={12}>12 phù thủy</option>
+                  <option value={16}>16 phù thủy</option>
+                  <option value={20}>20 phù thủy (Tối đa Hogwarts - Mặc định)</option>
                 </select>
               </div>
 

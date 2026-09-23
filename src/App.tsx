@@ -88,7 +88,7 @@ export const App: React.FC = () => {
     totalRounds: 3,
     language: 'vi',
     customWords: [],
-    maxPlayers: 8,
+    maxPlayers: 20,
   });
 
   const [phase, setPhase] = useState<GamePhase>('lobby');
@@ -939,7 +939,7 @@ export const App: React.FC = () => {
       totalRounds: configOverrides?.totalRounds || 3,
       language: configOverrides?.language || 'vi',
       customWords: configOverrides?.customWords || [],
-      maxPlayers: 8,
+      maxPlayers: configOverrides?.maxPlayers || 20,
     };
     setRoomConfig(newConfig);
 
@@ -1091,6 +1091,11 @@ export const App: React.FC = () => {
   // Add a Bot to current room
   const handleAddBot = () => {
     setPlayers((prev) => {
+      const maxLimit = roomConfig.maxPlayers || 20;
+      if (prev.length >= maxLimit) {
+        alert(`Phòng đã đầy tối đa ${maxLimit} phù thủy!`);
+        return prev;
+      }
       const newBot = createBotPlayer(prev.length);
       const updated = [...prev, newBot];
       const botJoinedMsg: ChatMessage = {

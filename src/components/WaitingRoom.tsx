@@ -386,7 +386,7 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
               className="font-cinzel"
             >
               <Users size={17} color="var(--hogwarts-gold)" />
-              Phù Thủy Trong Sảnh ({players.length}/8)
+              Phù Thủy Trong Sảnh ({players.length}/{roomConfig.maxPlayers || 20})
             </h3>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
               {roomConfig.language === 'vi' ? '🇻🇳 Tiếng Việt' : '🇬🇧 English'}
@@ -397,7 +397,7 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(115px, 1fr))',
               gap: '10px',
               padding: '2px',
             }}
@@ -492,7 +492,7 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
                 {selectedMode.name}
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                {players.length}/8 phù thủy sẵn sàng {players.length < 2 && '• (Bấm "+Bot" để thêm người)'}
+                {players.length}/{roomConfig.maxPlayers || 20} phù thủy sẵn sàng {players.length < 2 && '• (Bấm "+Bot" để thêm người)'}
               </div>
             </div>
           </div>
@@ -507,9 +507,10 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
                   soundManager.playClick();
                   onAddBot();
                 }}
+                disabled={players.length >= (roomConfig.maxPlayers || 20)}
                 className="btn-gryffindor"
-                style={{ padding: '12px 20px', fontSize: '14px', borderRadius: '12px' }}
-                title="Thêm học sinh Hogwarts AI vào phòng"
+                style={{ padding: '12px 20px', fontSize: '14px', borderRadius: '12px', opacity: players.length >= (roomConfig.maxPlayers || 20) ? 0.5 : 1 }}
+                title={players.length >= (roomConfig.maxPlayers || 20) ? 'Phòng đã đủ 20 người chơi!' : 'Thêm học sinh Hogwarts AI vào phòng'}
               >
                 <Bot size={18} /> Triệu Hồi Bot (+Bot)
               </button>
