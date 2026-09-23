@@ -778,16 +778,17 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
   ) : null;
 
   return (
-    <div ref={wrapperRef} className="canvas-board-wrapper">
-      {/* Hogwarts Magic Parchment Canvas */}
-      <div
-        className="canvas-parchment-container"
-        style={
-          boardDimensions
-            ? { width: `${boardDimensions.width}px`, height: `${boardDimensions.height}px` }
-            : undefined
-        }
-      >
+    <div className="canvas-board-outer-container">
+      <div ref={wrapperRef} className="canvas-board-wrapper">
+        {/* Hogwarts Magic Parchment Canvas */}
+        <div
+          className="canvas-parchment-container"
+          style={
+            boardDimensions
+              ? { width: `${boardDimensions.width}px`, height: `${boardDimensions.height}px` }
+              : undefined
+          }
+        >
         <canvas
           ref={canvasRef}
           width={LOGICAL_WIDTH}
@@ -949,6 +950,7 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
             </div>
           </div>
         )}
+        </div>
       </div>
 
       {/* Portaled Toolbar: mounts into right-panel-column on top of Chat on desktop */}

@@ -1363,89 +1363,141 @@ export const App: React.FC = () => {
       ) : (
         <>
           {/* In-Game Header Bar */}
-          <div className={`game-header-bar ${isMobile ? 'mobile-header-two-rows' : ''}`}>
+          <div className={`game-header-bar ${isMobile ? (isCanvasMaximized ? 'mobile-header-maximized' : 'mobile-header-two-rows') : ''}`}>
             {isMobile ? (
-              <>
-                {/* Mobile Row 1: Room Info & Exit on left, Timer & Sound on right */}
-                <div className="mobile-header-row-1">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              isCanvasMaximized ? (
+                /* Mobile Maximized Single-Row Focus Header */
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px', color: timeLeft <= 10 ? 'var(--accent-red)' : 'var(--accent-yellow)', fontWeight: 800, fontSize: '13px', flexShrink: 0 }}>
+                      <Clock size={14} /> {timeLeft}s
+                    </div>
+                    <span style={{ color: 'var(--border-card)' }}>|</span>
+                    <span style={{ fontSize: '11px', color: 'var(--hogwarts-gold)', fontWeight: 700, flexShrink: 0 }}>VẼ:</span>
+                    <span style={{ fontSize: '14px', fontWeight: 900, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} className="font-cinzel">
+                      {roomConfig.mode === 'rush_draw'
+                        ? (currentWord || currentPlayer.secretWord || 'Đang vẽ')
+                        : currentWord || 'Đang vẽ'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                    {roomConfig.mode === 'rush_draw' && (
+                      <button
+                        type="button"
+                        onClick={() => { setIsCanvasMaximized(false); setMobileTab('opponents'); }}
+                        className="btn-secondary"
+                        style={{ padding: '3px 8px', fontSize: '11px', borderRadius: '8px' }}
+                      >
+                        <Eye size={12} /> Soi ({players.filter((p) => p.id !== currentUserId.current).length})
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={() => setPhase('waiting_room')}
-                      className="btn-icon"
-                      title="Quay lại phòng chờ để đổi chế độ hoặc thêm bạn"
-                      style={{ padding: '6px' }}
+                      onClick={() => setIsCanvasMaximized(false)}
+                      className="btn-gold"
+                      style={{ padding: '3px 8px', fontSize: '11px', borderRadius: '8px' }}
+                      title="Thu nhỏ lại bình thường"
                     >
-                      <ArrowLeft size={16} />
+                      <Minimize2 size={12} /> Thu Nhỏ
                     </button>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <h3 style={{ fontSize: '14px', fontWeight: 800, color: 'var(--accent-cyan)', whiteSpace: 'nowrap', margin: 0 }}>
-                          {roomConfig.roomName}
-                        </h3>
-                        <span
-                          style={{
-                            background: 'rgba(212, 175, 55, 0.2)',
-                            border: '1px solid var(--border-gold)',
-                            color: 'var(--hogwarts-gold)',
-                            padding: '1px 6px',
-                            borderRadius: '8px',
-                            fontSize: '9.5px',
-                            fontWeight: 700,
-                          }}
-                        >
-                          {roomConfig.mode === 'dual_coop'
-                            ? 'Co-op'
-                            : roomConfig.mode === 'all_draw'
-                            ? 'Hợp Xướng'
-                            : roomConfig.mode === 'rush_draw'
-                            ? 'Đuổi Hình ⚡'
-                            : 'Độc Hành'}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Mobile Row 1: Room Info & Exit on left, Timer & Sound on right */}
+                  <div className="mobile-header-row-1">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setPhase('waiting_room')}
+                        className="btn-icon"
+                        title="Quay lại phòng chờ để đổi chế độ hoặc thêm bạn"
+                        style={{ padding: '6px' }}
+                      >
+                        <ArrowLeft size={16} />
+                      </button>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <h3 style={{ fontSize: '14px', fontWeight: 800, color: 'var(--accent-cyan)', whiteSpace: 'nowrap', margin: 0 }}>
+                            {roomConfig.roomName}
+                          </h3>
+                          <span
+                            style={{
+                              background: 'rgba(212, 175, 55, 0.2)',
+                              border: '1px solid var(--border-gold)',
+                              color: 'var(--hogwarts-gold)',
+                              padding: '1px 6px',
+                              borderRadius: '8px',
+                              fontSize: '9.5px',
+                              fontWeight: 700,
+                            }}
+                          >
+                            {roomConfig.mode === 'dual_coop'
+                              ? 'Co-op'
+                              : roomConfig.mode === 'all_draw'
+                              ? 'Hợp Xướng'
+                              : roomConfig.mode === 'rush_draw'
+                              ? 'Đuổi Hình ⚡'
+                              : 'Độc Hành'}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
+                          Vòng {round}/{roomConfig.totalRounds}
                         </span>
                       </div>
-                      <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
-                        Vòng {round}/{roomConfig.totalRounds}
-                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          background: timeLeft <= 10 ? 'rgba(239, 71, 111, 0.25)' : 'var(--bg-stage)',
+                          border: timeLeft <= 10 ? '2px solid var(--accent-red)' : '1px solid var(--border-card)',
+                          padding: '4px 10px',
+                          borderRadius: '12px',
+                          color: timeLeft <= 10 ? 'var(--accent-red)' : '#fff',
+                          fontWeight: 800,
+                          fontSize: '15px',
+                          animation: timeLeft <= 10 ? 'pulseGlow 1s infinite' : 'none',
+                        }}
+                      >
+                        <Clock size={15} color={timeLeft <= 10 ? 'var(--accent-red)' : 'var(--accent-yellow)'} />
+                        <span>{timeLeft}s</span>
+                      </div>
+
+                      {phase === 'drawing' && (
+                        <button
+                          type="button"
+                          onClick={() => setIsCanvasMaximized(true)}
+                          className="btn-icon"
+                          title="Phóng to bảng vẽ tối đa"
+                          style={{ padding: '6px' }}
+                        >
+                          <Maximize2 size={16} color="var(--hogwarts-gold)" />
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={toggleSound}
+                        className="btn-icon"
+                        title={isMuted ? 'Bật âm thanh' : 'Tắt âm thanh'}
+                        style={{ padding: '6px' }}
+                      >
+                        {isMuted ? <VolumeX size={16} color="var(--accent-red)" /> : <Volume2 size={16} color="var(--accent-cyan)" />}
+                      </button>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        background: timeLeft <= 10 ? 'rgba(239, 71, 111, 0.25)' : 'var(--bg-stage)',
-                        border: timeLeft <= 10 ? '2px solid var(--accent-red)' : '1px solid var(--border-card)',
-                        padding: '4px 10px',
-                        borderRadius: '12px',
-                        color: timeLeft <= 10 ? 'var(--accent-red)' : '#fff',
-                        fontWeight: 800,
-                        fontSize: '15px',
-                        animation: timeLeft <= 10 ? 'pulseGlow 1s infinite' : 'none',
-                      }}
-                    >
-                      <Clock size={15} color={timeLeft <= 10 ? 'var(--accent-red)' : 'var(--accent-yellow)'} />
-                      <span>{timeLeft}s</span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={toggleSound}
-                      className="btn-icon"
-                      title={isMuted ? 'Bật âm thanh' : 'Tắt âm thanh'}
-                      style={{ padding: '6px' }}
-                    >
-                      {isMuted ? <VolumeX size={16} color="var(--accent-red)" /> : <Volume2 size={16} color="var(--accent-cyan)" />}
-                    </button>
+                  {/* Mobile Row 2: Prominent Full-Width Word / Masked Clue */}
+                  <div className="mobile-header-row-2">
+                    {renderClueOrWordBanner()}
                   </div>
-                </div>
-
-                {/* Mobile Row 2: Prominent Full-Width Word / Masked Clue */}
-                <div className="mobile-header-row-2">
-                  {renderClueOrWordBanner()}
-                </div>
-              </>
+                </>
+              )
             ) : (
               <>
                 {/* Desktop Left: Back to Waiting Room & Room info */}
@@ -1530,7 +1582,7 @@ export const App: React.FC = () => {
           </div>
 
           {/* Mobile Tabs Switcher */}
-          {isMobile && (
+          {isMobile && !isCanvasMaximized && (
             <div className="mobile-tabs-container">
               <button
                 type="button"
@@ -1576,9 +1628,46 @@ export const App: React.FC = () => {
                   flex: 1,
                   minHeight: 0,
                   height: '100%',
-                  gap: '8px',
+                  gap: '4px',
                 }}
               >
+                {/* Header bar inside Tab 1 for Rush Draw */}
+                {roomConfig.mode === 'rush_draw' && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '2px 4px',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <span style={{ fontSize: '11px', color: 'var(--hogwarts-gold)', fontWeight: 700 }} className="font-cinzel">
+                      🎨 BẢNG VẼ CỦA BẠN
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsCanvasMaximized(!isCanvasMaximized)}
+                      style={{
+                        background: isCanvasMaximized ? 'rgba(56, 189, 248, 0.2)' : 'rgba(212, 175, 55, 0.15)',
+                        border: `1px solid ${isCanvasMaximized ? 'var(--accent-cyan)' : 'var(--border-gold)'}`,
+                        color: isCanvasMaximized ? 'var(--accent-cyan)' : 'var(--hogwarts-gold)',
+                        padding: '2px 8px',
+                        borderRadius: '8px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {isCanvasMaximized ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+                      <span>{isCanvasMaximized ? 'Thu Nhỏ' : '⛶ Phóng To Bảng'}</span>
+                    </button>
+                  </div>
+                )}
+
                 <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                   <CanvasBoard
                     isDrawer={roomConfig.mode === 'rush_draw' ? phase === 'drawing' : (isCurrentDrawer && phase === 'drawing')}
