@@ -210,7 +210,7 @@ export function useRoomConnection(params: RoomConnectionParams) {
           onChatMessage: (msg) => {
             if (!msg || typeof msg.text !== 'string') return;
             s.setMessages((prev) =>
-              appendBoundedMessage(prev, { ...msg, text: msg.text.slice(0, 220) })
+              appendBoundedMessage(prev, { ...msg, text: msg.text.slice(0, 300) })
             );
           },
           onPrivateChat: (targetId, msg, senderId) => {

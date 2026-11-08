@@ -355,6 +355,23 @@ export const App: React.FC = () => {
       ? revealedWord || currentWord
       : currentWord || currentPlayer.secretWord || '';
 
+  const isSelectingWord =
+    roomConfig.mode === 'rush_draw'
+      ? !hasSubmittedRushWord
+      : currentUserId.current === currentDrawerIdRef.current;
+
+  const selectingDrawerName =
+    roomConfig.mode === 'rush_draw'
+      ? 'Mọi người'
+      : roomConfig.mode === 'dual_coop' || roomConfig.mode === 'all_draw'
+      ? players
+          .filter((p) => p.isDrawer)
+          .map((p) => p.name)
+          .join(' & ') ||
+        currentDrawer?.name ||
+        'Pháp sư'
+      : currentDrawer?.name || 'Pháp sư';
+
   return (
     <div
       className={`game-container ${
@@ -429,6 +446,11 @@ export const App: React.FC = () => {
             currentUserId={currentUserId.current}
             isHost={isHost}
             isCurrentDrawer={isCurrentDrawer}
+            isSelectingWord={isSelectingWord}
+            selectingDrawerName={selectingDrawerName}
+            wordChoices={wordChoices}
+            timeLeft={timeLeft}
+            onSelectWord={(word) => handleWordSelected(word)}
             displayWordForOverlay={displayWordForOverlay}
             roundEndMessage={roundEndMessage}
             messages={messages}

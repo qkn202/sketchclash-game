@@ -388,7 +388,9 @@ export function useTurnController(refs: SharedGameRefs, setters: SharedGameSette
     const cfg = r.roomConfigRef.current;
     const turnToken = r.turnTokenRef.current;
     r.phaseRef.current = 'round_end';
+    r.timeLeftRef.current = 5;
     s.setPhase('round_end');
+    s.setTimeLeft(5);
     s.setInspectingPlayerId(null);
     s.setInspectFeedback(null);
     soundManager.playVictory();
@@ -404,6 +406,7 @@ export function useTurnController(refs: SharedGameRefs, setters: SharedGameSette
 
       s.broadcastGameState({
         phase: 'round_end',
+        timeLeft: 5,
         revealedWord: titleWord,
         roundEndMessage: msg,
         players: r.playersRef.current,
@@ -421,7 +424,7 @@ export function useTurnController(refs: SharedGameRefs, setters: SharedGameSette
         } else {
           startNewTurn(0, nextRound, currentPlayers);
         }
-      }, 4500);
+      }, 5000);
       r.botTimeoutsRef.current.push(tid);
       return;
     }
@@ -433,6 +436,7 @@ export function useTurnController(refs: SharedGameRefs, setters: SharedGameSette
 
     s.broadcastGameState({
       phase: 'round_end',
+      timeLeft: 5,
       revealedWord: answer,
       roundEndMessage: msg,
       players: r.playersRef.current,
@@ -452,7 +456,7 @@ export function useTurnController(refs: SharedGameRefs, setters: SharedGameSette
       } else {
         startNewTurn(nextDrawerIdx, nextRound, currentPlayers);
       }
-    }, 4000);
+    }, 5000);
     r.botTimeoutsRef.current.push(tid);
   }, [startNewTurn]);
 

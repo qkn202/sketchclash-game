@@ -78,13 +78,32 @@ export const GameHeaderBar: React.FC<GameHeaderBarProps> = ({
     }
 
     if (phase !== 'drawing') {
-      if (roundEndMessage) {
+      if (phase === 'round_end' && roundEndMessage) {
         return (
           <div
             style={{ color: 'var(--hogwarts-gold)', fontSize: isMobile ? '13px' : '15px', fontWeight: 800, whiteSpace: 'pre-line' }}
             className="font-cinzel"
           >
             {roundEndMessage}
+          </div>
+        );
+      }
+      if (phase === 'selecting_word') {
+        const drawerNames =
+          roomConfig.mode === 'rush_draw'
+            ? 'Mọi người'
+            : players
+                .filter((p) => p.isDrawer)
+                .map((p) => p.name)
+                .join(' & ') || 'Pháp sư';
+        return (
+          <div
+            style={{ color: 'var(--hogwarts-gold)', fontSize: isMobile ? '12.5px' : '14.5px', fontWeight: 700 }}
+            className="font-cinzel"
+          >
+            {isCurrentDrawer
+              ? '📜 Hãy chọn 1 từ khóa bí mật để bắt đầu vẽ!'
+              : `⏳ ${drawerNames} đang chọn từ khóa... (Chat tự do bên dưới)`}
           </div>
         );
       }
@@ -150,6 +169,8 @@ export const GameHeaderBar: React.FC<GameHeaderBarProps> = ({
           style={{
             display: 'inline-flex',
             alignItems: 'center',
+            justifyContent: 'center',
+            flexWrap: 'wrap',
             gap: '6px',
             background: 'rgba(116, 0, 1, 0.25)',
             padding: isMobile ? '4px 12px' : '4px 14px',
@@ -163,11 +184,12 @@ export const GameHeaderBar: React.FC<GameHeaderBarProps> = ({
           </span>
           <span
             style={{
-              fontSize: isMobile ? '16px' : 'clamp(15px, 3.8vw, 20px)',
+              fontSize: isMobile ? '15px' : 'clamp(15px, 3.8vw, 20px)',
               fontWeight: 900,
               letterSpacing: '1px',
               color: '#fff',
-              whiteSpace: 'nowrap',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
             }}
             className="font-cinzel"
           >
@@ -187,6 +209,8 @@ export const GameHeaderBar: React.FC<GameHeaderBarProps> = ({
         style={{
           display: 'inline-flex',
           alignItems: 'center',
+          justifyContent: 'center',
+          flexWrap: 'wrap',
           gap: '6px',
           background: 'rgba(26, 71, 42, 0.25)',
           padding: isMobile ? '4px 12px' : '4px 14px',
@@ -200,11 +224,12 @@ export const GameHeaderBar: React.FC<GameHeaderBarProps> = ({
         </span>
         <span
           style={{
-            fontSize: isMobile ? '18px' : 'clamp(15px, 4vw, 22px)',
+            fontSize: isMobile ? '16px' : 'clamp(15px, 4vw, 22px)',
             fontWeight: 900,
-            letterSpacing: '3px',
+            letterSpacing: isMobile ? '2px' : '3px',
             color: '#fff',
-            whiteSpace: 'nowrap',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
           }}
         >
           {maskedWord}

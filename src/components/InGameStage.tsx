@@ -39,6 +39,11 @@ interface InGameStageProps {
   onRemovePlayer: (playerId: string) => void;
   onInspectOpponent: (playerId: string) => void;
   renderPartyStage?: (toolbarSlot: HTMLElement | null) => React.ReactNode;
+  isSelectingWord?: boolean;
+  selectingDrawerName?: string;
+  wordChoices?: string[];
+  timeLeft?: number;
+  onSelectWord?: (word: string) => void;
 }
 
 export const InGameStage: React.FC<InGameStageProps> = ({
@@ -71,6 +76,11 @@ export const InGameStage: React.FC<InGameStageProps> = ({
   onRemovePlayer,
   onInspectOpponent,
   renderPartyStage,
+  isSelectingWord = false,
+  selectingDrawerName = 'Họa sĩ',
+  wordChoices = [],
+  timeLeft = 15,
+  onSelectWord,
 }) => {
   const [rushViewTab, setRushViewTab] = useState<'my_board' | 'opponents'>('my_board');
   const [showMiniOpponentsStrip, setShowMiniOpponentsStrip] = useState<boolean>(false);
@@ -81,6 +91,8 @@ export const InGameStage: React.FC<InGameStageProps> = ({
     if (!isSolved) return undefined;
     return solvedWordsMap[opp.id] || opp.secretWord;
   };
+
+  const effectiveRushTab = phase === 'drawing' ? rushViewTab : 'my_board';
 
   return (
     <main style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -101,7 +113,7 @@ export const InGameStage: React.FC<InGameStageProps> = ({
               ? 'Suy Luận'
               : 'Bảng Vẽ'}
           </button>
-          {roomConfig.mode === 'rush_draw' && (
+          {roomConfig.mode === 'rush_draw' && phase === 'drawing' && (
             <button
               type="button"
               aria-pressed={mobileTab === 'opponents'}
@@ -132,7 +144,7 @@ export const InGameStage: React.FC<InGameStageProps> = ({
 
       {isMobile ? (
         <MobileGameStage
-          mobileTab={mobileTab}
+          mobileTab={mobileTab === 'opponents' && phase !== 'drawing' ? 'canvas' : mobileTab}
           isCanvasMaximized={isCanvasMaximized}
           onToggleMaximize={onToggleMaximize}
           showMiniOpponentsStrip={showMiniOpponentsStrip}
@@ -161,6 +173,11 @@ export const InGameStage: React.FC<InGameStageProps> = ({
           onRemovePlayer={onRemovePlayer}
           onInspectOpponent={onInspectOpponent}
           partyStageContent={renderPartyStage ? renderPartyStage(null) : undefined}
+          isSelectingWord={isSelectingWord}
+          selectingDrawerName={selectingDrawerName}
+          wordChoices={wordChoices}
+          timeLeft={timeLeft}
+          onSelectWord={onSelectWord}
         />
       ) : (
         <div className={`game-main-grid ${roomConfig.mode === 'rush_draw' ? 'rush-mode' : ''} ${isCanvasMaximized ? 'canvas-maximized' : ''}`}>
@@ -188,22 +205,24 @@ export const InGameStage: React.FC<InGameStageProps> = ({
               <div className="rush-view-switcher">
                 <button
                   type="button"
-                  aria-pressed={rushViewTab === 'my_board'}
-                  className={`rush-view-btn ${rushViewTab === 'my_board' ? 'active' : ''}`}
+                  aria-pressed={effectiveRushTab === 'my_board'}
+                  className={`rush-view-btn ${effectiveRushTab === 'my_board' ? 'active' : ''}`}
                   onClick={() => setRushViewTab('my_board')}
                 >
                   <Palette size={14} aria-hidden="true" /> Bảng Vẽ Của Tôi ✏️
                 </button>
-                <button
-                  type="button"
-                  aria-pressed={rushViewTab === 'opponents'}
-                  className={`rush-view-btn ${rushViewTab === 'opponents' ? 'active' : ''}`}
-                  onClick={() => setRushViewTab('opponents')}
-                >
-                  <Eye size={14} aria-hidden="true" /> Soi Tranh Đối Thủ 👁️ ({opponents.length})
-                </button>
+                {phase === 'drawing' && (
+                  <button
+                    type="button"
+                    aria-pressed={effectiveRushTab === 'opponents'}
+                    className={`rush-view-btn ${effectiveRushTab === 'opponents' ? 'active' : ''}`}
+                    onClick={() => setRushViewTab('opponents')}
+                  >
+                    <Eye size={14} aria-hidden="true" /> Soi Tranh Đối Thủ 👁️ ({opponents.length})
+                  </button>
+                )}
 
-                {rushViewTab === 'my_board' && (
+                {effectiveRushTab === 'my_board' && phase === 'drawing' && (
                   <button
                     type="button"
                     aria-pressed={showMiniOpponentsStrip}
@@ -226,7 +245,7 @@ export const InGameStage: React.FC<InGameStageProps> = ({
                   aria-pressed={isCanvasMaximized}
                   className="rush-view-btn"
                   style={{
-                    marginLeft: rushViewTab !== 'my_board' ? 'auto' : '4px',
+                    marginLeft: effectiveRushTab !== 'my_board' || phase !== 'drawing' ? 'auto' : '4px',
                     fontSize: '11px',
                     padding: '3px 8px',
                     color: isCanvasMaximized ? 'var(--accent-cyan)' : 'var(--text-muted)',
@@ -242,7 +261,7 @@ export const InGameStage: React.FC<InGameStageProps> = ({
 
               <div
                 style={{
-                  display: rushViewTab === 'my_board' ? 'flex' : 'none',
+                  display: effectiveRushTab === 'my_board' ? 'flex' : 'none',
                   flexDirection: 'column',
                   flex: 1,
                   minHeight: 0,
@@ -264,10 +283,15 @@ export const InGameStage: React.FC<InGameStageProps> = ({
                     roundEndMessage={roundEndMessage}
                     initialActions={myRushDrawActions}
                     toolbarPortalTarget={toolbarSlot}
+                    isSelectingWord={isSelectingWord}
+                    selectingDrawerName={selectingDrawerName}
+                    wordChoices={wordChoices}
+                    timeLeft={timeLeft}
+                    onSelectWord={onSelectWord}
                   />
                 </div>
 
-                {showMiniOpponentsStrip && (
+                {showMiniOpponentsStrip && phase === 'drawing' && (
                   <div className="rush-thumbnail-strip">
                     {opponents.map((opp) => {
                       const isSolved = (currentPlayer.solvedOpponentIds || []).includes(opp.id);
@@ -288,7 +312,7 @@ export const InGameStage: React.FC<InGameStageProps> = ({
                 )}
               </div>
 
-              <div className="rush-opponents-grid" style={{ display: rushViewTab === 'opponents' ? 'grid' : 'none' }}>
+              <div className="rush-opponents-grid" style={{ display: effectiveRushTab === 'opponents' ? 'grid' : 'none' }}>
                 {opponents.map((opp) => {
                   const isSolved = (currentPlayer.solvedOpponentIds || []).includes(opp.id);
                   return (
@@ -319,6 +343,11 @@ export const InGameStage: React.FC<InGameStageProps> = ({
               roundEndMessage={roundEndMessage}
               initialActions={myRushDrawActions}
               toolbarPortalTarget={toolbarSlot}
+              isSelectingWord={isSelectingWord}
+              selectingDrawerName={selectingDrawerName}
+              wordChoices={wordChoices}
+              timeLeft={timeLeft}
+              onSelectWord={onSelectWord}
             />
           )}
 
@@ -331,6 +360,7 @@ export const InGameStage: React.FC<InGameStageProps> = ({
               hasGuessed={currentPlayer.hasGuessed}
               currentPlayer={currentPlayer}
               mode={roomConfig.mode}
+              phase={phase}
             />
           </div>
         </div>

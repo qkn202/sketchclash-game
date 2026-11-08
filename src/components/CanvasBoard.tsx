@@ -33,6 +33,11 @@ interface CanvasBoardProps {
   hideClearButton?: boolean;
   hideOverlayBadges?: boolean;
   onSingleStrokeComplete?: () => void;
+  isSelectingWord?: boolean;
+  selectingDrawerName?: string;
+  wordChoices?: string[];
+  timeLeft?: number;
+  onSelectWord?: (word: string) => void;
 }
 
 export const CanvasBoard: React.FC<CanvasBoardProps> = ({
@@ -54,6 +59,11 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
   hideClearButton = false,
   hideOverlayBadges = false,
   onSingleStrokeComplete,
+  isSelectingWord = false,
+  selectingDrawerName,
+  wordChoices,
+  timeLeft,
+  onSelectWord,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [tool, setTool] = useState<ToolType>('brush');
@@ -466,6 +476,11 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
               phase={phase}
               currentWord={currentWord}
               roundEndMessage={roundEndMessage}
+              isSelectingWord={isSelectingWord}
+              selectingDrawerName={selectingDrawerName}
+              wordChoices={wordChoices}
+              timeLeft={timeLeft}
+              onSelectWord={onSelectWord}
             />
           )}
         </div>

@@ -1,6 +1,5 @@
 import React from 'react';
 import type { DrawAction, GamePhase, Player, RoomConfig } from '../types';
-import { WordPickerModal } from './WordPickerModal';
 import { InspectBoardModal } from './InspectBoardModal';
 import { VictoryPodium } from './VictoryPodium';
 
@@ -60,23 +59,14 @@ interface GameOverlaysProps {
 
 export const GameOverlays: React.FC<GameOverlaysProps> = ({
   phase,
-  roomConfig,
   players,
   currentPlayer,
-  currentDrawer,
   currentUserId,
-  currentDrawerId,
   isHost,
-  timeLeft,
-  currentWord,
-  wordChoices,
-  hasSubmittedRushWord,
-  canvasResetKey,
   inspectingPlayerId,
   inspectFeedback,
   opponentDrawActions,
   solvedWordsMap,
-  onSelectWord,
   onClearInspectFeedback,
   onCloseInspect,
   onInspectGuess,
@@ -90,34 +80,6 @@ export const GameOverlays: React.FC<GameOverlaysProps> = ({
 
   return (
     <>
-      {phase === 'selecting_word' && (
-        <WordPickerModal
-          key={`picker_${canvasResetKey}_${currentDrawer?.id || 'rush'}`}
-          isDrawer={
-            roomConfig.mode === 'rush_draw'
-              ? !hasSubmittedRushWord
-              : currentUserId === currentDrawerId
-          }
-          drawerName={
-            roomConfig.mode === 'rush_draw'
-              ? hasSubmittedRushWord
-                ? `Các phù thủy khác (Bạn đã chọn: "${currentWord}")`
-                : `${currentPlayer?.name || 'Bạn'} (Đuổi Hình Bắt Chữ)`
-              : roomConfig.mode === 'dual_coop'
-              ? players
-                  .filter((p) => p.isDrawer)
-                  .map((p) => p.name)
-                  .join(' & ') || 'Hai Pháp Sư'
-              : roomConfig.mode === 'all_draw'
-              ? currentDrawer?.name || 'Đại Diện Họa Sĩ'
-              : currentDrawer?.name || 'Họa sĩ'
-          }
-          wordChoices={wordChoices}
-          timeLeft={timeLeft}
-          onSelectWord={onSelectWord}
-        />
-      )}
-
       {inspectedOpponent && (() => {
         const isSolved = (currentPlayer.solvedOpponentIds || []).includes(inspectedOpponent.id);
         return (

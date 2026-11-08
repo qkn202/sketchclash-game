@@ -328,21 +328,26 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: 56px;
-  overflow: hidden;
+  max-height: clamp(88px, 20dvh, 175px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding-right: 2px;
 }
 
 .mobile-live-ticker {
-  font-size: 12px;
-  padding: 4px 10px;
+  font-size: 12.5px;
+  line-height: 1.38;
+  padding: 5px 10px;
   border-radius: 8px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   animation: bounceIn 0.25s ease-out;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  flex-shrink: 0;
 }
 .mobile-live-ticker.correct {
   background: rgba(45, 212, 191, 0.2);

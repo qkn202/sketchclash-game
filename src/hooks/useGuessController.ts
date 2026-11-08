@@ -90,7 +90,7 @@ export function useGuessController(
 
   const handlePlayerGuess = useCallback(
     (sender: Player, text: string, targetOpponentId?: string) => {
-      const trimmed = String(text || '').trim().slice(0, 120);
+      const trimmed = String(text || '').trim().slice(0, 250);
       if (!trimmed) return;
 
       if (!sender.isBot) {

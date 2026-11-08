@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import type { ChatMessage, Player, GameMode } from '../types';
+import type { ChatMessage, Player, GameMode, GamePhase } from '../types';
 import { Send, Smile } from 'lucide-react';
 import { soundManager } from '../utils/audio';
 
@@ -12,6 +12,7 @@ interface ChatPanelProps {
   hasGuessed: boolean;
   currentPlayer: Player;
   mode?: GameMode;
+  phase?: GamePhase;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -21,6 +22,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   hasGuessed,
   currentPlayer,
   mode,
+  phase,
 }) => {
   const chatInputId = React.useId();
   const [inputVal, setInputVal] = useState('');
@@ -47,10 +49,24 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     onSendMessage(emoji);
   };
 
-  const isChatDisabled =
-    mode === 'rush_draw' || mode === 'relay_phone' || mode === 'polyjuice_impostor'
-      ? false
-      : isDrawer;
+  const placeholderText =
+    mode === 'rush_draw'
+      ? phase === 'drawing'
+        ? 'Gõ dự đoán bảo bối của bất kỳ đối thủ nào...'
+        : 'Trò chuyện tự do cùng cả phòng...'
+      : mode === 'relay_phone'
+      ? 'Trò chuyện tự do cùng cả phòng...'
+      : mode === 'polyjuice_impostor'
+      ? 'Thảo luận suy luận truy tìm Kẻ Giả Mạo...'
+      : phase === 'selecting_word'
+      ? 'Đang chọn từ... Trò chuyện tự do cùng cả phòng!'
+      : phase === 'round_end'
+      ? 'Kết thúc lượt! Trò chuyện tự do cùng cả phòng...'
+      : isDrawer
+      ? 'Trò chuyện cùng phòng (không lộ đáp án)...'
+      : hasGuessed
+      ? 'Bạn đã đoán trúng! Trò chuyện tự do...'
+      : 'Gõ dự đoán của bạn...';
 
   return (
     <div
@@ -112,16 +128,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   padding: '6px 10px',
                   borderRadius: '6px',
                   fontSize: '13px',
+                  lineHeight: 1.4,
                   color: '#06d6a0',
                   fontWeight: 700,
                   display: 'flex',
-                  alignItems: 'center',
+                  alignItems: 'flex-start',
                   gap: '6px',
                   animation: 'bounceIn 0.3s ease',
+                  wordBreak: 'break-word',
+                  overflowWrap: 'anywhere',
                 }}
               >
-                <span aria-hidden="true">🎉</span>
-                <span>{msg.text}</span>
+                <span aria-hidden="true" style={{ flexShrink: 0 }}>🎉</span>
+                <span style={{ flex: 1, minWidth: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                  {msg.text}
+                </span>
               </div>
             );
           }
@@ -136,8 +157,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   padding: '5px 10px',
                   borderRadius: '6px',
                   fontSize: '12px',
+                  lineHeight: 1.4,
                   color: '#ffd166',
                   fontWeight: 600,
+                  wordBreak: 'break-word',
+                  overflowWrap: 'anywhere',
+                  whiteSpace: 'pre-wrap',
                 }}
               >
                 <span aria-hidden="true">⚠️ </span>{msg.text}
@@ -152,9 +177,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 style={{
                   textAlign: 'center',
                   fontSize: '11px',
+                  lineHeight: 1.4,
                   color: 'var(--text-muted)',
-                  padding: '4px 0',
+                  padding: '4px 6px',
                   fontStyle: 'italic',
+                  wordBreak: 'break-word',
+                  overflowWrap: 'anywhere',
+                  whiteSpace: 'pre-wrap',
                 }}
               >
                 — {msg.text} —
@@ -162,25 +191,26 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             );
           }
 
-          // Regular chat message
+          // Regular chat message — inline flow so long messages wrap across the full width
           const isOwn = msg.playerId === currentPlayer.id;
           return (
             <div
               key={msgKey}
               style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '6px',
                 fontSize: '13px',
-                padding: '3px 6px',
+                lineHeight: 1.45,
+                padding: '4px 8px',
                 borderRadius: '8px',
                 background: isOwn ? 'rgba(59, 130, 246, 0.08)' : 'transparent',
+                wordBreak: 'break-word',
+                overflowWrap: 'anywhere',
+                whiteSpace: 'pre-wrap',
               }}
             >
-              <span style={{ fontWeight: 700, color: isOwn ? 'var(--accent-cyan)' : 'var(--accent-yellow)' }}>
+              <span style={{ fontWeight: 700, color: isOwn ? 'var(--accent-cyan)' : 'var(--accent-yellow)', marginRight: '6px' }}>
                 {msg.playerName}:
               </span>
-              <span style={{ color: '#fff', wordBreak: 'break-word' }}>{msg.text}</span>
+              <span style={{ color: '#fff', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{msg.text}</span>
             </div>
           );
         })}
@@ -238,7 +268,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           id={chatInputId}
           name="guess"
           type="text"
-          maxLength={120}
+          maxLength={250}
           enterKeyHint="send"
           value={inputVal}
           onChange={(e) => setInputVal(e.target.value)}
@@ -247,26 +277,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               e.preventDefault();
             }
           }}
-          placeholder={
-            mode === 'rush_draw'
-              ? 'Gõ dự đoán bảo bối của bất kỳ đối thủ nào...'
-              : mode === 'relay_phone'
-              ? 'Trò chuyện tự do cùng cả phòng...'
-              : mode === 'polyjuice_impostor'
-              ? 'Thảo luận suy luận truy tìm Kẻ Giả Mạo...'
-              : isDrawer
-              ? 'Bạn đang vẽ, không thể đoán!'
-              : hasGuessed
-              ? 'Bạn đã đoán trúng! Trò chuyện tự do...'
-              : 'Gõ dự đoán của bạn...'
-          }
-          disabled={isChatDisabled}
+          placeholder={placeholderText}
           style={{ flex: 1, padding: '8px 12px', fontSize: '16px' }}
         />
         <button
           type="submit"
           aria-label="Gửi tin nhắn hoặc dự đoán"
-          disabled={isChatDisabled || !inputVal.trim()}
+          disabled={!inputVal.trim()}
           className="btn-primary"
           style={{ padding: '0 14px', minBlockSize: '40px', borderRadius: '12px' }}
         >

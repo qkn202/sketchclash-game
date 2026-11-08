@@ -75,18 +75,18 @@ export function useRoundTimers({
     [currentUserId, currentWordRef, handlePlayerGuessRef, hostIdRef, playersRef, roomConfigRef]
   );
 
-  // Word-selection countdown timer so header clock & modal share one authoritative
+  // Word-selection & round-end countdown timer so header clock & overlay share one authoritative
   // countdown. Wall-clock based (same rationale as the drawing timer above) so a
   // throttled background tab shows the real remaining time instead of freezing.
   useEffect(() => {
-    if (phase !== 'selecting_word') return;
+    if (phase !== 'selecting_word' && phase !== 'round_end') return;
     const initial = timeLeftRef.current;
     const deadline = Date.now() + Math.max(0, initial) * 1000;
     const timer = setInterval(() => {
       const next = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
       timeLeftRef.current = next;
       setTimeLeft(next);
-      if (next > 0 && next <= 5) {
+      if (phase === 'selecting_word' && next > 0 && next <= 5) {
         soundManager.playTick();
       }
     }, 1000);
