@@ -22,6 +22,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   currentPlayer,
   mode,
 }) => {
+  const chatInputId = React.useId();
   const [inputVal, setInputVal] = useState('');
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -45,6 +46,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     soundManager.playToolSelect();
     onSendMessage(emoji);
   };
+
+  const isChatDisabled =
+    mode === 'rush_draw' || mode === 'relay_phone' || mode === 'polyjuice_impostor'
+      ? false
+      : isDrawer;
 
   return (
     <div
@@ -74,7 +80,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           flexShrink: 0,
         }}
       >
-        <Smile size={17} color="var(--accent-yellow)" />
+        <Smile size={17} color="var(--accent-yellow)" aria-hidden="true" />
         <h4 style={{ fontSize: '14px', fontWeight: 700 }}>Đoán Chữ & Trò Chuyện</h4>
       </div>
 
@@ -114,7 +120,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   animation: 'bounceIn 0.3s ease',
                 }}
               >
-                <span>🎉</span>
+                <span aria-hidden="true">🎉</span>
                 <span>{msg.text}</span>
               </div>
             );
@@ -134,7 +140,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   fontWeight: 600,
                 }}
               >
-                ⚠️ {msg.text}
+                <span aria-hidden="true">⚠️ </span>{msg.text}
               </div>
             );
           }
@@ -196,15 +202,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           <button
             key={emoji}
             type="button"
+            aria-label={`Thả cảm xúc ${emoji}`}
             onClick={() => handleEmojiClick(emoji)}
             style={{
               background: 'transparent',
               fontSize: '17px',
               padding: '2px 4px',
+              minInlineSize: '30px',
+              minBlockSize: '30px',
               borderRadius: '8px',
               transition: 'transform 0.1s',
             }}
-            title={`Thả cảm xúc ${emoji}`}
           >
             {emoji}
           </button>
@@ -223,29 +231,46 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           flexShrink: 0,
         }}
       >
+        <label htmlFor={chatInputId} className="visually-hidden">
+          Dự đoán từ khóa hoặc trò chuyện
+        </label>
         <input
+          id={chatInputId}
+          name="guess"
           type="text"
+          maxLength={120}
+          enterKeyHint="send"
           value={inputVal}
           onChange={(e) => setInputVal(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.nativeEvent.isComposing || e.keyCode === 229)) {
+              e.preventDefault();
+            }
+          }}
           placeholder={
             mode === 'rush_draw'
               ? 'Gõ dự đoán bảo bối của bất kỳ đối thủ nào...'
+              : mode === 'relay_phone'
+              ? 'Trò chuyện tự do cùng cả phòng...'
+              : mode === 'polyjuice_impostor'
+              ? 'Thảo luận suy luận truy tìm Kẻ Giả Mạo...'
               : isDrawer
               ? 'Bạn đang vẽ, không thể đoán!'
               : hasGuessed
               ? 'Bạn đã đoán trúng! Trò chuyện tự do...'
               : 'Gõ dự đoán của bạn...'
           }
-          disabled={mode === 'rush_draw' ? false : isDrawer}
+          disabled={isChatDisabled}
           style={{ flex: 1, padding: '8px 12px', fontSize: '16px' }}
         />
         <button
           type="submit"
-          disabled={(mode === 'rush_draw' ? false : isDrawer) || !inputVal.trim()}
+          aria-label="Gửi tin nhắn hoặc dự đoán"
+          disabled={isChatDisabled || !inputVal.trim()}
           className="btn-primary"
-          style={{ padding: '0 14px', minHeight: '40px', borderRadius: '12px' }}
+          style={{ padding: '0 14px', minBlockSize: '40px', borderRadius: '12px' }}
         >
-          <Send size={15} />
+          <Send size={15} aria-hidden="true" />
         </button>
       </form>
     </div>

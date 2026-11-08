@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import type { Player, RoomConfig, GameMode } from '../types';
 import { AvatarDisplay } from './AvatarPicker';
-import { Wand2, Users, Bot, Play, Copy, Check, ArrowLeft, Sparkles, Shield, Crown } from 'lucide-react';
+import { ModeSelectorPanel, GAME_MODES } from './ModeSelectorPanel';
+import { WaitingRoomSettings } from './WaitingRoomSettings';
+import { Users, Bot, Play, Copy, Check, ArrowLeft, Sparkles, Shield, Crown, Link2, X } from 'lucide-react';
 import { soundManager } from '../utils/audio';
 
 interface WaitingRoomProps {
@@ -10,54 +12,12 @@ interface WaitingRoomProps {
   currentPlayerId: string;
   isHost: boolean;
   onModeChange: (mode: GameMode) => void;
+  onRoomConfigChange: (partial: Partial<RoomConfig>) => void;
   onAddBot: () => void;
+  onRemovePlayer: (playerId: string) => void;
   onStartGame: () => void;
   onLeaveRoom: () => void;
 }
-
-interface GameModeOption {
-  id: GameMode;
-  name: string;
-  subtitle: string;
-  icon: string;
-  badge: string;
-  desc: string;
-}
-
-const GAME_MODES: GameModeOption[] = [
-  {
-    id: 'classic',
-    name: 'Độc Hành Phép Thuật',
-    subtitle: '1 Người Vẽ — Cả Phòng Đoán',
-    icon: '🪄',
-    badge: 'Cổ Điển',
-    desc: 'Từng pháp sư lần lượt múa đũa vẽ bảo bối bí mật, những người còn lại so tài tốc độ giải mã.',
-  },
-  {
-    id: 'rush_draw',
-    name: 'Đuổi Hình Bắt Chữ',
-    subtitle: 'Vừa Vẽ Vừa Đoán Đồng Thời',
-    icon: '⚡',
-    badge: 'MỚI • Đấu Trí Tốc Độ',
-    desc: 'Mỗi người nhận 1 từ khóa bí mật riêng biệt! Tất cả cùng lúc vừa vẽ tranh của mình, vừa soi tranh đối thủ để gõ đoán ghi điểm.',
-  },
-  {
-    id: 'dual_coop',
-    name: 'Song Kiếm Hợp Bích',
-    subtitle: '2 Phù Thủy Cùng Vẽ Song Song',
-    icon: '🤝',
-    badge: 'Co-op 2 Người',
-    desc: '2 pháp sư cùng cầm đũa vẽ trực tiếp lên 1 bảng vẽ theo thời gian thực! Nhân đôi điểm thưởng tương trợ.',
-  },
-  {
-    id: 'all_draw',
-    name: 'Đại Hợp Xướng',
-    subtitle: 'Tất Cả Cùng Vẽ — 1 Người Đoán',
-    icon: '🎭',
-    badge: 'Hỗn Loạn Cực Vui',
-    desc: 'Chỉ 1 người làm Thám Tử duy nhất! Tất cả những người còn lại đồng loạt múa đũa để gợi ý cho Thám Tử.',
-  },
-];
 
 export const WaitingRoom: React.FC<WaitingRoomProps> = ({
   roomConfig,
@@ -65,26 +25,42 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
   currentPlayerId,
   isHost,
   onModeChange,
+  onRoomConfigChange,
   onAddBot,
+  onRemovePlayer,
   onStartGame,
   onLeaveRoom,
 }) => {
-  const [copied, setCopied] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   const handleCopyCode = () => {
     soundManager.playClick();
-    navigator.clipboard.writeText(roomConfig.roomCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    navigator.clipboard.writeText(roomConfig.roomCode).catch(() => {});
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
   };
 
-  const selectedMode = GAME_MODES.find((m) => m.id === (roomConfig.mode || 'classic')) || GAME_MODES[0];
+  const handleCopyInviteLink = () => {
+    soundManager.playClick();
+    const t = roomConfig.roomToken
+      ? `&t=${encodeURIComponent(roomConfig.roomToken)}`
+      : '';
+    const url = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(roomConfig.roomCode)}${t}`;
+    navigator.clipboard.writeText(url).catch(() => {});
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  const selectedModeId = roomConfig.mode || 'classic';
+  const selectedMode = GAME_MODES.find((m) => m.id === selectedModeId) || GAME_MODES[0];
   const canStart = players.length >= 2;
+  const maxPlayers = roomConfig.maxPlayers || 20;
 
   return (
-    <div className="waiting-room-container">
+    <main className="waiting-room-container">
       {/* Top Navigation & Quick Host Action Bar */}
-      <div
+      <header
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -102,20 +78,20 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
           <button
             type="button"
             onClick={onLeaveRoom}
+            aria-label="Rời phòng về đại sảnh"
             className="btn-icon"
-            title="Rời phòng về đại sảnh"
             style={{ padding: '8px' }}
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={18} aria-hidden="true" />
           </button>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h2
+              <h1
                 className="gold-title"
                 style={{ fontSize: 'clamp(16px, 3.5vw, 22px)', fontWeight: 900, margin: 0 }}
               >
                 {roomConfig.roomName}
-              </h2>
+              </h1>
               <span
                 style={{
                   background: 'rgba(212, 175, 55, 0.2)',
@@ -137,7 +113,7 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
         </div>
 
         {/* Room Code & Copy */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <div
             style={{
               background: 'rgba(0, 0, 0, 0.4)',
@@ -167,197 +143,38 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
             type="button"
             onClick={handleCopyCode}
             className="btn-icon"
-            title="Sao chép mã phòng gửi bạn bè"
-            style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '4px', minHeight: '34px' }}
+            style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '4px', minBlockSize: '36px' }}
           >
-            {copied ? <Check size={14} color="#4ade80" /> : <Copy size={14} />}
-            <span style={{ fontSize: '11px' }}>{copied ? 'Đã chép!' : 'Chép'}</span>
+            {copiedCode ? <Check size={14} color="#4ade80" aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+            <span style={{ fontSize: '11px' }}>{copiedCode ? 'Đã chép mã!' : 'Chép Mã'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleCopyInviteLink}
+            className="btn-icon"
+            style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '4px', minBlockSize: '36px', borderColor: 'var(--border-gold)' }}
+          >
+            {copiedLink ? <Check size={14} color="#4ade80" aria-hidden="true" /> : <Link2 size={14} color="var(--hogwarts-gold)" aria-hidden="true" />}
+            <span style={{ fontSize: '11px', color: 'var(--hogwarts-gold)' }}>{copiedLink ? 'Đã chép Link!' : 'Link Mời'}</span>
           </button>
         </div>
-      </div>
+      </header>
+
+      <WaitingRoomSettings
+        roomConfig={roomConfig}
+        playersCount={players.length}
+        isHost={isHost}
+        onRoomConfigChange={onRoomConfigChange}
+      />
 
       {/* Main Content Layout */}
       <div className="waiting-room-grid">
-        {/* Left Column: Game Mode Selection (Host Controls) */}
-        <div
-          style={{
-            background: 'var(--bg-card)',
-            padding: '18px',
-            borderRadius: '18px',
-            border: '2px solid var(--border-card)',
-            boxShadow: 'var(--card-shadow)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3
-              style={{
-                fontSize: '16px',
-                fontWeight: 800,
-                color: 'var(--hogwarts-gold)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                margin: 0,
-              }}
-              className="font-cinzel"
-            >
-              <Wand2 size={17} color="var(--hogwarts-gold)" />
-              {isHost ? 'Thiết Lập Chế Độ Chơi (Host)' : 'Chế Độ Đang Chọn'}
-            </h3>
-            {isHost && (
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                Chạm để đổi chế độ
-              </span>
-            )}
-          </div>
-
-          {/* Mode Selection Cards */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {GAME_MODES.map((mode) => {
-              const isSelected = (roomConfig.mode || 'classic') === mode.id;
-              return (
-                <button
-                  key={mode.id}
-                  type="button"
-                  disabled={!isHost}
-                  onClick={() => {
-                    if (!isHost) return;
-                    soundManager.playToolSelect();
-                    onModeChange(mode.id);
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '14px',
-                    borderRadius: '14px',
-                    textAlign: 'left',
-                    cursor: isHost ? 'pointer' : 'default',
-                    background: isSelected
-                      ? mode.id === 'rush_draw'
-                        ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.28) 0%, rgba(124, 58, 237, 0.22) 100%)'
-                        : 'linear-gradient(135deg, rgba(212, 175, 55, 0.24) 0%, rgba(116, 0, 1, 0.28) 100%)'
-                      : 'rgba(255, 255, 255, 0.03)',
-                    border: isSelected
-                      ? mode.id === 'rush_draw'
-                        ? '2px solid #c084fc'
-                        : '2px solid var(--hogwarts-gold)'
-                      : '1px solid rgba(255, 255, 255, 0.08)',
-                    boxShadow: isSelected
-                      ? mode.id === 'rush_draw'
-                        ? '0 0 18px rgba(192, 132, 252, 0.35)'
-                        : '0 0 16px rgba(255, 216, 117, 0.25)'
-                      : 'none',
-                    transition: 'all 0.2s ease',
-                    position: 'relative',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: '26px',
-                      background: 'rgba(0, 0, 0, 0.4)',
-                      width: '42px',
-                      height: '42px',
-                      borderRadius: '10px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      border: isSelected
-                        ? mode.id === 'rush_draw'
-                          ? '1px solid #c084fc'
-                          : '1px solid var(--hogwarts-gold)'
-                        : 'none',
-                    }}
-                  >
-                    {mode.icon}
-                  </div>
-
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                        <span
-                          style={{
-                            fontSize: '14px',
-                            fontWeight: 800,
-                            color: isSelected
-                              ? mode.id === 'rush_draw'
-                                ? '#e9d5ff'
-                                : 'var(--hogwarts-gold)'
-                              : '#fff',
-                          }}
-                          className="font-cinzel"
-                        >
-                          {mode.name}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: '9px',
-                            background: mode.id === 'rush_draw'
-                              ? 'linear-gradient(135deg, #9333ea 0%, #6b21a8 100%)'
-                              : 'rgba(255, 255, 255, 0.1)',
-                            border: mode.id === 'rush_draw'
-                              ? '1px solid #c084fc'
-                              : '1px solid rgba(255, 255, 255, 0.15)',
-                            color: '#fff',
-                            padding: '1px 6px',
-                            borderRadius: '6px',
-                            fontWeight: 700,
-                          }}
-                        >
-                          {mode.badge}
-                        </span>
-                      </div>
-                      {isSelected && (
-                        <span
-                          style={{
-                            fontSize: '9px',
-                            background: mode.id === 'rush_draw' ? '#c084fc' : 'var(--hogwarts-gold)',
-                            color: mode.id === 'rush_draw' ? '#2e1065' : '#261601',
-                            padding: '2px 6px',
-                            borderRadius: '8px',
-                            fontWeight: 800,
-                            flexShrink: 0,
-                          }}
-                        >
-                          ĐANG CHỌN
-                        </span>
-                      )}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: '11px',
-                        color: isSelected
-                          ? mode.id === 'rush_draw'
-                            ? '#d8b4fe'
-                            : '#fef08a'
-                          : 'var(--text-muted)',
-                        fontWeight: 600,
-                        marginTop: '2px',
-                      }}
-                    >
-                      {mode.subtitle}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: '11px',
-                        color: 'rgba(255, 255, 255, 0.65)',
-                        marginTop: '3px',
-                        lineHeight: 1.3,
-                      }}
-                    >
-                      {mode.desc}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <ModeSelectorPanel
+          selectedModeId={selectedModeId}
+          isHost={isHost}
+          onModeChange={onModeChange}
+        />
 
         {/* Right Column: Player Roster in Great Hall */}
         <div
@@ -373,7 +190,7 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3
+            <h2
               style={{
                 fontSize: '16px',
                 fontWeight: 800,
@@ -385,15 +202,14 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
               }}
               className="font-cinzel"
             >
-              <Users size={17} color="var(--hogwarts-gold)" />
-              Phù Thủy Trong Sảnh ({players.length}/{roomConfig.maxPlayers || 20})
-            </h3>
+              <Users size={17} color="var(--hogwarts-gold)" aria-hidden="true" />
+              Phù Thủy Trong Sảnh ({players.length}/{maxPlayers})
+            </h2>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
               {roomConfig.language === 'vi' ? '🇻🇳 Tiếng Việt' : '🇬🇧 English'}
             </span>
           </div>
 
-          {/* Players Grid: Natural in-flow display (NO inner scroll container) */}
           <div
             style={{
               display: 'grid',
@@ -424,9 +240,37 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
                     position: 'relative',
                   }}
                 >
-                  {/* Host Crown */}
+                  {isHost && !isMe && (
+                    <button
+                      type="button"
+                      aria-label={p.isBot ? `Thu hồi Pháp sư AI ${p.name}` : `Mời ${p.name} rời phòng`}
+                      onClick={() => {
+                        soundManager.playClick();
+                        onRemovePlayer(p.id);
+                      }}
+                      style={{
+                        position: 'absolute',
+                        top: '4px',
+                        left: '4px',
+                        minInlineSize: '24px',
+                        minBlockSize: '24px',
+                        padding: '2px',
+                        borderRadius: '8px',
+                        background: 'rgba(185, 28, 28, 0.82)',
+                        border: '1px solid rgba(254, 202, 202, 0.5)',
+                        color: '#fff',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <X size={13} aria-hidden="true" />
+                    </button>
+                  )}
+
                   {p.isHost && (
-                    <div style={{ position: 'absolute', top: '6px', right: '6px' }} title="Trưởng phòng (Host)">
+                    <div style={{ position: 'absolute', top: '6px', right: '6px' }} aria-hidden="true">
                       <Crown size={14} color="#ffd700" />
                     </div>
                   )}
@@ -455,7 +299,6 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
             })}
           </div>
 
-          {/* Mode Rules Guide Box */}
           <div
             style={{
               marginTop: 'auto',
@@ -470,29 +313,31 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
               gap: '10px',
             }}
           >
-            <Shield size={18} color="var(--hogwarts-gold)" style={{ flexShrink: 0 }} />
+            <Shield size={18} color="var(--hogwarts-gold)" style={{ flexShrink: 0 }} aria-hidden="true" />
             <div>
               <strong style={{ color: '#fff' }}>Luật Thi Đấu: </strong>
               {selectedMode.id === 'classic' && 'Mỗi lượt 1 người vẽ, tất cả cùng gõ phím giải mã tên bảo bối.'}
               {selectedMode.id === 'dual_coop' && 'Mỗi lượt 2 người cùng vẽ song song! Đoán đúng sẽ cộng điểm cho cả 2 họa sĩ.'}
               {selectedMode.id === 'all_draw' && 'Chỉ 1 người đoán! Tất cả những người còn lại đều cầm đũa vẽ cùng lúc để gợi ý.'}
               {selectedMode.id === 'rush_draw' && 'Tất cả cùng nhận từ khóa riêng và cùng vẽ! Vừa vẽ vừa soi tranh đối thủ để gõ đoán ghi điểm.'}
+              {selectedMode.id === 'relay_phone' && 'Truyền tay dây chuyền Viết câu → Vẽ tranh → Đoán nghĩa, cuối ván cùng lật mở Nhật Ký và thả biểu cảm (+15đ)! (Tự động gọi đủ tối thiểu 3 người).'}
+              {selectedMode.id === 'polyjuice_impostor' && 'Mỗi người lần lượt vẽ 1 nét bằng màu mực riêng. 1 Kẻ Giả Mạo không biết từ khóa bí mật — bỏ phiếu bắt kẻ gian hoặc lật kèo phút chót! (Tối thiểu 4 người).'}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Big Bottom Action Card: In natural page flow (NO sticky overlap) */}
+      {/* Big Bottom Action Card */}
       <div className="waiting-room-launch-card">
         <div className="dock-info">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '24px' }}>{selectedMode.icon}</span>
+            <span style={{ fontSize: '24px' }} aria-hidden="true">{selectedMode.icon}</span>
             <div>
               <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--hogwarts-gold)' }} className="font-cinzel">
                 {selectedMode.name}
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                {players.length}/{roomConfig.maxPlayers || 20} phù thủy sẵn sàng {players.length < 2 && '• (Bấm "+Bot" để thêm người)'}
+                {players.length}/{maxPlayers} phù thủy sẵn sàng {players.length < 2 && '• (Bấm "+Bot" để thêm người)'}
               </div>
             </div>
           </div>
@@ -507,13 +352,34 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
                   soundManager.playClick();
                   onAddBot();
                 }}
-                disabled={players.length >= (roomConfig.maxPlayers || 20)}
+                disabled={players.length >= maxPlayers}
                 className="btn-gryffindor"
-                style={{ padding: '12px 20px', fontSize: '14px', borderRadius: '12px', opacity: players.length >= (roomConfig.maxPlayers || 20) ? 0.5 : 1 }}
-                title={players.length >= (roomConfig.maxPlayers || 20) ? 'Phòng đã đủ 20 người chơi!' : 'Thêm học sinh Hogwarts AI vào phòng'}
+                style={{ padding: '12px 18px', fontSize: '14px', borderRadius: '12px' }}
               >
-                <Bot size={18} /> Triệu Hồi Bot (+Bot)
+                <Bot size={18} aria-hidden="true" /> Triệu Hồi Bot (+Bot)
               </button>
+
+              {players.some((p) => p.isBot) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundManager.playClick();
+                    const lastBot = [...players].reverse().find((p) => p.isBot);
+                    if (lastBot) onRemovePlayer(lastBot.id);
+                  }}
+                  className="btn-icon"
+                  style={{
+                    padding: '10px 14px',
+                    fontSize: '13px',
+                    borderRadius: '12px',
+                    gap: '6px',
+                    borderColor: 'rgba(248, 113, 113, 0.6)',
+                    color: '#fca5a5',
+                  }}
+                >
+                  <X size={15} aria-hidden="true" /> Thu Hồi Bot (-Bot)
+                </button>
+              )}
 
               <button
                 type="button"
@@ -531,7 +397,7 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
                   boxShadow: canStart ? '0 6px 20px rgba(255, 216, 117, 0.4)' : 'none',
                 }}
               >
-                <Play size={18} />
+                <Play size={18} aria-hidden="true" />
                 <span>BẮT ĐẦU VÁN ĐẤU</span>
               </button>
             </>
@@ -547,12 +413,12 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({
               }}
               className="font-cinzel"
             >
-              <Sparkles size={16} />
+              <Sparkles size={16} aria-hidden="true" />
               <span>Đang đợi Trưởng Phòng khai mạc ván đấu...</span>
             </div>
           )}
         </div>
       </div>
-    </div>
+    </main>
   );
 };

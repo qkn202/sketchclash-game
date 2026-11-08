@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import type { DrawAction } from '../types';
-import { clearCanvas, renderDrawAction, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../utils/canvasRenderer';
+import { clearCanvas, applyDrawActionAsync, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../utils/canvasRenderer';
 import { ZoomIn, CheckCircle2 } from 'lucide-react';
 
 interface MiniCanvasBoardProps {
@@ -25,9 +25,17 @@ export const MiniCanvasBoard: React.FC<MiniCanvasBoardProps> = ({
   className = '',
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const renderedIndexRef = useRef<number>(0);
+  const lastSeqRef = useRef<number>(0);
+  const resetGenerationRef = useRef<number>(0);
+  const renderQueueRef = useRef<Promise<void>>(Promise.resolve());
 
-  // Redraw all or incremental
+  useEffect(() => {
+    return () => {
+      resetGenerationRef.current += 1;
+    };
+  }, []);
+
+  // Sequential async-safe rendering supporting strokes, fills, clears, AND Undo/Redo 'restore' snapshots
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -35,32 +43,51 @@ export const MiniCanvasBoard: React.FC<MiniCanvasBoardProps> = ({
     if (!ctx) return;
 
     if (actions.length === 0) {
-      clearCanvas(ctx);
-      renderedIndexRef.current = 0;
+      resetGenerationRef.current += 1;
+      const gen = resetGenerationRef.current;
+      lastSeqRef.current = 0;
+      renderQueueRef.current = renderQueueRef.current.then(() => {
+        if (resetGenerationRef.current === gen) clearCanvas(ctx);
+      });
       return;
     }
 
-    // Check if a 'clear' action was introduced, or if actions were reset
-    const lastClearIdx = actions.map(a => a.type).lastIndexOf('clear');
-    if (lastClearIdx >= renderedIndexRef.current || renderedIndexRef.current > actions.length) {
-      clearCanvas(ctx);
-      const startIdx = Math.max(0, lastClearIdx);
-      for (let i = startIdx; i < actions.length; i++) {
-        renderDrawAction(ctx, actions[i]);
+    const pending = actions.filter((a, idx) => (a._seq ?? idx + 1) > lastSeqRef.current);
+    if (pending.length === 0) return;
+
+    const highestSeq = pending.reduce((m, a, idx) => Math.max(m, a._seq ?? idx + 1), lastSeqRef.current);
+    lastSeqRef.current = highestSeq;
+    const gen = resetGenerationRef.current;
+
+    renderQueueRef.current = renderQueueRef.current.then(async () => {
+      for (const act of pending) {
+        if (resetGenerationRef.current !== gen) return;
+        await applyDrawActionAsync(ctx, act);
       }
-      renderedIndexRef.current = actions.length;
-    } else {
-      // Incremental render of only new actions
-      for (let i = renderedIndexRef.current; i < actions.length; i++) {
-        renderDrawAction(ctx, actions[i]);
-      }
-      renderedIndexRef.current = actions.length;
-    }
+    });
   }, [actions]);
 
   return (
     <div
       onClick={onInspect}
+      role={onInspect ? 'button' : undefined}
+      tabIndex={onInspect ? 0 : undefined}
+      aria-label={onInspect ? `Phóng to soi tranh của ${playerName}` : undefined}
+      onKeyDown={
+        onInspect
+          ? (e) => {
+              if (e.key === 'Enter') onInspect();
+              if (e.key === ' ') e.preventDefault();
+            }
+          : undefined
+      }
+      onKeyUp={
+        onInspect
+          ? (e) => {
+              if (e.key === ' ') onInspect();
+            }
+          : undefined
+      }
       className={`mini-canvas-card ${className}`}
       style={{
         position: 'relative',
@@ -111,7 +138,7 @@ export const MiniCanvasBoard: React.FC<MiniCanvasBoardProps> = ({
               textAlign: 'center',
             }}
           >
-            <CheckCircle2 size={28} color="#4ade80" />
+            <CheckCircle2 size={28} color="#4ade80" aria-hidden="true" />
             <div style={{ fontSize: '12px', fontWeight: 800, color: '#4ade80', textTransform: 'uppercase' }}>
               Đã Giải Mã!
             </div>
@@ -137,6 +164,7 @@ export const MiniCanvasBoard: React.FC<MiniCanvasBoardProps> = ({
         {/* Zoom In button hint on hover */}
         {onInspect && (
           <div
+            aria-hidden="true"
             style={{
               position: 'absolute',
               top: '6px',
@@ -150,7 +178,6 @@ export const MiniCanvasBoard: React.FC<MiniCanvasBoardProps> = ({
               justifyContent: 'center',
               transition: 'opacity 0.2s',
             }}
-            title="Phóng to soi tranh"
           >
             <ZoomIn size={14} />
           </div>

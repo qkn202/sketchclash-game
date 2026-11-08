@@ -1,5 +1,5 @@
 import type { Player, DrawAction, Point } from '../types';
-import { WORDS } from '../data/words';
+import { WORDS, normalizeGuess } from '../data/words';
 
 export interface BotPreset {
   name: string;
@@ -32,14 +32,35 @@ export const BOT_PRESETS: BotPreset[] = [
   { name: 'Gia Tinh Dobby', avatarColor: '#faedcd', eyes: 'star', mouth: 'smile', accessory: 'none' },
 ];
 
-export function createBotPlayer(index: number = 0): Player {
-  const presetIndex = index % BOT_PRESETS.length;
-  const preset = BOT_PRESETS[presetIndex];
-  const cycle = Math.floor(index / BOT_PRESETS.length);
-  const botName = cycle > 0 ? `${preset.name} #${cycle + 1}` : preset.name;
+export function createBotPlayer(indexOrExisting: number | Player[] = 0): Player {
+  let preset: BotPreset;
+  let botName: string;
+  let numericTag: number;
+
+  if (Array.isArray(indexOrExisting)) {
+    const usedNames = new Set(indexOrExisting.map((p) => p.name.toLowerCase()));
+    const unusedIdx = BOT_PRESETS.findIndex((bp) => !usedNames.has(bp.name.toLowerCase()));
+    if (unusedIdx >= 0) {
+      preset = BOT_PRESETS[unusedIdx];
+      botName = preset.name;
+      numericTag = unusedIdx;
+    } else {
+      const botCount = indexOrExisting.filter((p) => p.isBot).length;
+      preset = BOT_PRESETS[botCount % BOT_PRESETS.length];
+      const cycle = Math.floor(botCount / BOT_PRESETS.length) + 1;
+      botName = `${preset.name} #${cycle + 1}`;
+      numericTag = botCount;
+    }
+  } else {
+    const presetIndex = indexOrExisting % BOT_PRESETS.length;
+    preset = BOT_PRESETS[presetIndex];
+    const cycle = Math.floor(indexOrExisting / BOT_PRESETS.length);
+    botName = cycle > 0 ? `${preset.name} #${cycle + 1}` : preset.name;
+    numericTag = indexOrExisting;
+  }
 
   return {
-    id: `bot_wizard_${Date.now()}_${index}`,
+    id: `bot_wizard_${Date.now()}_${numericTag}_${Math.random().toString(36).slice(2, 5)}`,
     name: botName,
     avatar: {
       color: preset.avatarColor,
@@ -52,18 +73,24 @@ export function createBotPlayer(index: number = 0): Player {
     isDrawer: false,
     hasGuessed: false,
     isBot: true,
+    joinedAt: Date.now() + numericTag,
   };
 }
 
 /**
  * Generate magical procedural drawings for Bot Drawer
  */
-export function generateProceduralDrawing(word: string, drawerId?: string): DrawAction[] {
+export function generateProceduralDrawing(
+  word: string,
+  drawerId?: string,
+  includeClear: boolean = true
+): DrawAction[] {
   const actions: DrawAction[] = [];
   const lower = word.toLowerCase();
 
-  // Clear canvas first
-  actions.push({ type: 'clear' });
+  if (includeClear) {
+    actions.push({ type: 'clear' });
+  }
 
   if (lower.includes('snitch') || lower.includes('vàng')) {
     // === Golden Snitch (Quả Snitch Vàng) ===
@@ -254,7 +281,12 @@ export function getBotGuess(
     return word;
   }
 
-  const pool = WORDS[lang];
-  const randomPick = pool[Math.floor(Math.random() * pool.length)];
+  // An "inaccurate" guess must NOT equal the live word (normalized), otherwise a bot
+  // can accidentally print the answer and award itself a free solve. Exclude the
+  // live word from the random pool; fall back to it only if the pool is empty.
+  const targetKey = normalizeGuess(word);
+  const pool = WORDS[lang].filter((w) => normalizeGuess(w) !== targetKey);
+  const randomPick =
+    pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : word;
   return randomPick;
 }

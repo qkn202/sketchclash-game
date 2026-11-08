@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Player, GameMode } from '../types';
 import { AvatarDisplay } from './AvatarPicker';
-import { Crown, Wand2, CheckCircle2, Bot, UserPlus, Copy, Check, Sparkles } from 'lucide-react';
+import { Crown, Wand2, CheckCircle2, Bot, Copy, Check, Sparkles, X } from 'lucide-react';
 import { soundManager } from '../utils/audio';
 
 interface ScoreBoardProps {
@@ -9,22 +9,27 @@ interface ScoreBoardProps {
   currentUserId: string;
   currentDrawerId?: string | null;
   roomCode: string;
+  roomToken?: string;
   round: number;
   totalRounds: number;
+  maxPlayers?: number;
   isHost: boolean;
   onAddBot?: () => void;
+  onRemovePlayer?: (playerId: string) => void;
   mode?: GameMode;
 }
 
 export const ScoreBoard: React.FC<ScoreBoardProps> = ({
   players,
   currentUserId,
-  currentDrawerId,
   roomCode,
+  roomToken,
   round,
   totalRounds,
+  maxPlayers = 20,
   isHost,
   onAddBot,
+  onRemovePlayer,
   mode = 'classic',
 }) => {
   const [copied, setCopied] = React.useState(false);
@@ -33,11 +38,12 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
 
   const copyRoomLink = () => {
     soundManager.playClick();
-    const url = window.location.href;
+    const t = roomToken ? `&t=${encodeURIComponent(roomToken)}` : '';
+    const url = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(roomCode)}${t}`;
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    });
+    }).catch(() => {});
   };
 
   return (
@@ -69,7 +75,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
       >
         <div>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }} className="font-cinzel">
-            VÒNG THI ĐẤU
+            {mode === 'relay_phone' ? 'CHẶNG CUỘN GIẤY' : 'VÒNG THI ĐẤU'}
           </span>
           <h4 style={{ fontSize: '16px', color: 'var(--hogwarts-gold)', fontWeight: 800 }} className="font-cinzel">
             {round} / {totalRounds}
@@ -87,7 +93,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
             <button
               type="button"
               onClick={copyRoomLink}
-              title="Sao chép liên kết sảnh"
+              aria-label={`Sao chép liên kết mời vào sảnh ${roomCode}`}
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -95,9 +101,12 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
+                minInlineSize: '28px',
+                minBlockSize: '28px',
+                justifyContent: 'center',
               }}
             >
-              {copied ? <Check size={14} /> : <Copy size={14} />}
+              {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
             </button>
           </div>
         </div>
@@ -174,6 +183,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                   <Crown
                     size={13}
                     color="#ffd875"
+                    aria-hidden="true"
                     style={{ position: 'absolute', top: -5, right: -4, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.8))' }}
                   />
                 )}
@@ -195,9 +205,41 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                     {player.name}
                   </span>
                   {player.isBot && (
-                    <span title="Pháp sư AI Hogwarts" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                      <Bot size={13} color="var(--accent-blue)" />
+                    <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                      <Bot size={13} color="var(--accent-blue)" aria-hidden="true" />
+                      <span className="visually-hidden"> (Pháp sư AI Hogwarts)</span>
                     </span>
+                  )}
+                  {isHost && !isCurrent && onRemovePlayer && (
+                    <button
+                      type="button"
+                      aria-label={
+                        player.isBot
+                          ? `Thu hồi Pháp sư AI ${player.name}`
+                          : `Mời ${player.name} rời sảnh`
+                      }
+                      onClick={() => {
+                        soundManager.playClick();
+                        onRemovePlayer(player.id);
+                      }}
+                      style={{
+                        marginLeft: 'auto',
+                        background: 'rgba(185, 28, 28, 0.3)',
+                        border: '1px solid rgba(248, 113, 113, 0.45)',
+                        color: '#fca5a5',
+                        borderRadius: '6px',
+                        padding: '2px',
+                        minInlineSize: '20px',
+                        minBlockSize: '20px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <X size={11} aria-hidden="true" />
+                    </button>
                   )}
                 </div>
 
@@ -223,7 +265,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                       }}
                       className="font-cinzel"
                     >
-                      ⚡ {(player.solvedOpponentIds || []).length}/{Math.max(1, players.length - 1)}
+                      <span aria-hidden="true">⚡</span> {(player.solvedOpponentIds || []).length}/{Math.max(1, players.length - 1)}
                     </span>
                   ) : isDrawer ? (
                     <span
@@ -240,8 +282,16 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                       }}
                       className="font-cinzel"
                     >
-                      <Wand2 size={10} />
-                      {mode === 'dual_coop' ? 'Vẽ Co-op' : mode === 'all_draw' ? 'Cùng Vẽ' : 'Vẽ'}
+                      <Wand2 size={10} aria-hidden="true" />
+                      {mode === 'dual_coop'
+                        ? 'Vẽ Co-op'
+                        : mode === 'all_draw'
+                        ? 'Cùng Vẽ'
+                        : mode === 'polyjuice_impostor'
+                        ? 'Vẽ 1 nét'
+                        : mode === 'relay_phone'
+                        ? 'Họa tranh'
+                        : 'Vẽ'}
                     </span>
                   ) : isLoneGuesser ? (
                     <span
@@ -259,7 +309,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                       }}
                       className="font-cinzel"
                     >
-                      <Sparkles size={10} /> Thám Tử
+                      <Sparkles size={10} aria-hidden="true" /> Thám Tử
                     </span>
                   ) : hasGuessed ? (
                     <span
@@ -276,7 +326,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                       }}
                       className="font-cinzel"
                     >
-                      <CheckCircle2 size={10} /> Đúng
+                      <CheckCircle2 size={10} aria-hidden="true" /> Đúng
                     </span>
                   ) : null}
                 </div>
@@ -291,6 +341,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
         <div style={{ padding: '8px 10px', borderTop: '1px solid var(--border-card)', flexShrink: 0 }}>
           <button
             type="button"
+            disabled={players.length >= maxPlayers}
             onClick={() => {
               soundManager.playClick();
               onAddBot();
@@ -298,7 +349,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
             className="btn-gold"
             style={{ width: '100%', padding: '8px', fontSize: '13px' }}
           >
-            <Sparkles size={15} /> Triệu Hồi Pháp Sư AI
+            <Sparkles size={15} aria-hidden="true" /> Triệu Hồi Pháp Sư AI
           </button>
         </div>
       )}

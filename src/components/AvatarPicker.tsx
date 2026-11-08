@@ -1,22 +1,22 @@
 import React from 'react';
 import type { AvatarConfig, EyeType, MouthType, AccessoryType } from '../types';
-import { Wand2, RefreshCw, Sparkles } from 'lucide-react';
+import { Wand2, RefreshCw } from 'lucide-react';
 import { soundManager } from '../utils/audio';
 
 // 4 Hogwarts Houses & Wizarding Colors
-const HOGWARTS_COLORS = [
-  '#740001', // Gryffindor Scarlet
-  '#ffd875', // Gryffindor Gold
-  '#1a472a', // Slytherin Emerald
-  '#0e1a40', // Ravenclaw Sapphire
-  '#d3a625', // Hufflepuff Amber
-  '#160c28', // Dark Magic Midnight
-  '#9b111e', // Phoenix Red
-  '#38bdf8', // Lumos Blue
-  '#e2d9c8', // Old Parchment
-  '#2d6a4f', // Potion Green
-  '#4a154b', // Elder Magic Purple
-  '#cbd5e1', // Hogwarts Ghost Silver
+const HOGWARTS_COLORS: { hex: string; label: string }[] = [
+  { hex: '#740001', label: 'Đỏ Gryffindor' },
+  { hex: '#ffd875', label: 'Vàng Hogwarts' },
+  { hex: '#1a472a', label: 'Xanh Slytherin' },
+  { hex: '#0e1a40', label: 'Xanh Ravenclaw' },
+  { hex: '#d3a625', label: 'Vàng Hufflepuff' },
+  { hex: '#160c28', label: 'Đêm Ma Thuật' },
+  { hex: '#9b111e', label: 'Đỏ Phượng Hoàng' },
+  { hex: '#38bdf8', label: 'Xanh Lumos' },
+  { hex: '#e2d9c8', label: 'Giấy Da Cổ' },
+  { hex: '#2d6a4f', label: 'Xanh Độc Dược' },
+  { hex: '#4a154b', label: 'Tím Phép Cổ' },
+  { hex: '#cbd5e1', label: 'Bạc Ma Hogwarts' },
 ];
 
 const EYE_TYPES: { id: EyeType; label: string }[] = [
@@ -62,6 +62,7 @@ export const AvatarDisplay: React.FC<AvatarDisplayProps> = ({ avatar, size = 64,
       width={s}
       height={s}
       viewBox={`0 0 ${s} ${s}`}
+      aria-hidden="true"
       className={`rounded-full shadow-lg transition-transform hover:scale-105 ${className}`}
       style={{ overflow: 'visible' }}
     >
@@ -287,9 +288,10 @@ interface AvatarPickerProps {
 }
 
 export const AvatarPicker: React.FC<AvatarPickerProps> = ({ avatar, onChange }) => {
+  const baseId = React.useId();
   const randomize = () => {
     soundManager.playToolSelect();
-    const newColor = HOGWARTS_COLORS[Math.floor(Math.random() * HOGWARTS_COLORS.length)];
+    const newColor = HOGWARTS_COLORS[Math.floor(Math.random() * HOGWARTS_COLORS.length)].hex;
     const newEyes = EYE_TYPES[Math.floor(Math.random() * EYE_TYPES.length)].id;
     const newMouth = MOUTH_TYPES[Math.floor(Math.random() * MOUTH_TYPES.length)].id;
     const newAccessory = ACCESSORIES[Math.floor(Math.random() * ACCESSORIES.length)].id;
@@ -313,7 +315,7 @@ export const AvatarPicker: React.FC<AvatarPickerProps> = ({ avatar, onChange }) 
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
         <h3 style={{ fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--hogwarts-gold)' }} className="font-cinzel">
-          <Wand2 size={20} color="var(--hogwarts-gold)" /> Tạo Pháp Sư Của Bạn
+          <Wand2 size={20} color="var(--hogwarts-gold)" aria-hidden="true" /> Tạo Pháp Sư Của Bạn
         </h3>
         <button
           type="button"
@@ -321,7 +323,7 @@ export const AvatarPicker: React.FC<AvatarPickerProps> = ({ avatar, onChange }) 
           className="btn-yellow"
           style={{ padding: '6px 14px', fontSize: '13px' }}
         >
-          <RefreshCw size={14} /> Bùa Biến Hình
+          <RefreshCw size={14} aria-hidden="true" /> Bùa Biến Hình
         </button>
       </div>
 
@@ -332,28 +334,32 @@ export const AvatarPicker: React.FC<AvatarPickerProps> = ({ avatar, onChange }) 
 
         {/* Color Palette (House Robes) */}
         <div style={{ flex: 1, minWidth: '200px' }}>
-          <label style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>
             Màu áo choàng Nhà Hogwarts:
-          </label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px' }}>
+          </span>
+          <div role="group" aria-label="Màu áo choàng Nhà Hogwarts" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px' }}>
             {HOGWARTS_COLORS.map((c) => (
               <button
-                key={c}
+                key={c.hex}
                 type="button"
+                aria-label={`Chọn màu áo ${c.label}`}
+                aria-pressed={avatar.color === c.hex}
                 onClick={() => {
                   soundManager.playToolSelect();
-                  onChange({ ...avatar, color: c });
+                  onChange({ ...avatar, color: c.hex });
                 }}
                 style={{
                   width: '100%',
                   aspectRatio: '1',
                   maxWidth: '36px',
                   maxHeight: '36px',
+                  minInlineSize: '28px',
+                  minBlockSize: '28px',
                   borderRadius: '50%',
-                  background: c,
-                  border: avatar.color === c ? '3px solid var(--hogwarts-gold)' : '2px solid rgba(0,0,0,0.4)',
-                  transform: avatar.color === c ? 'scale(1.15)' : 'scale(1)',
-                  boxShadow: avatar.color === c ? '0 0 12px rgba(255, 216, 117, 0.6)' : 'none',
+                  background: c.hex,
+                  border: avatar.color === c.hex ? '3px solid var(--hogwarts-gold)' : '2px solid rgba(0,0,0,0.4)',
+                  transform: avatar.color === c.hex ? 'scale(1.15)' : 'scale(1)',
+                  boxShadow: avatar.color === c.hex ? '0 0 12px rgba(255, 216, 117, 0.6)' : 'none',
                 }}
               />
             ))}
@@ -364,10 +370,11 @@ export const AvatarPicker: React.FC<AvatarPickerProps> = ({ avatar, onChange }) 
       {/* Selectors */}
       <div className="avatar-selectors-grid">
         <div>
-          <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+          <label htmlFor={`${baseId}-eyes`} style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
             Ánh mắt:
           </label>
           <select
+            id={`${baseId}-eyes`}
             value={avatar.eyes}
             onChange={(e) => {
               soundManager.playToolSelect();
@@ -382,10 +389,11 @@ export const AvatarPicker: React.FC<AvatarPickerProps> = ({ avatar, onChange }) 
         </div>
 
         <div>
-          <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+          <label htmlFor={`${baseId}-mouth`} style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
             Biểu cảm:
           </label>
           <select
+            id={`${baseId}-mouth`}
             value={avatar.mouth}
             onChange={(e) => {
               soundManager.playToolSelect();
@@ -400,10 +408,11 @@ export const AvatarPicker: React.FC<AvatarPickerProps> = ({ avatar, onChange }) 
         </div>
 
         <div>
-          <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+          <label htmlFor={`${baseId}-accessory`} style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
             Bảo bối phép:
           </label>
           <select
+            id={`${baseId}-accessory`}
             value={avatar.accessory}
             onChange={(e) => {
               soundManager.playToolSelect();

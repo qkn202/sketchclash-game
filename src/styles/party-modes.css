@@ -1,0 +1,396 @@
+/* ==========================================================================
+   Party Modes Styles: Relay Phone ("Tam Sao Thất Bản") & Polyjuice Impostor
+   ========================================================================== */
+
+.visually-hidden {
+  position: absolute;
+  clip-path: inset(50%);
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  white-space: nowrap;
+}
+
+/* Directional View Transitions for Relay Showcase Album Navigation */
+@keyframes slide-to-left {
+  to {
+    transform: translateX(-28%);
+    opacity: 0;
+  }
+}
+
+@keyframes slide-from-right {
+  from {
+    transform: translateX(28%);
+    opacity: 0;
+  }
+}
+
+@keyframes slide-to-right {
+  to {
+    transform: translateX(28%);
+    opacity: 0;
+  }
+}
+
+@keyframes slide-from-left {
+  from {
+    transform: translateX(-28%);
+    opacity: 0;
+  }
+}
+
+::view-transition-group(root) {
+  animation: 0.32s ease-in-out both;
+}
+
+html:active-view-transition-type(forward)::view-transition-old(root) {
+  animation-name: slide-to-left;
+}
+
+html:active-view-transition-type(forward)::view-transition-new(root) {
+  animation-name: slide-from-right;
+}
+
+html:active-view-transition-type(backward)::view-transition-old(root) {
+  animation-name: slide-to-right;
+}
+
+html:active-view-transition-type(backward)::view-transition-new(root) {
+  animation-name: slide-from-left;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(root) {
+    animation: none !important;
+  }
+}
+
+/* Shared Party Stage Shell */
+.party-stage-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  gap: 8px;
+  overflow: hidden;
+}
+
+/* Mode 1: Relay Phone Progress Tracker & Cards */
+.relay-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 12px;
+  padding: 6px 10px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.relay-progress-tracker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex-wrap: wrap;
+}
+
+.relay-step-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.relay-step-pill.step-done {
+  color: #86efac;
+  border-color: rgba(74, 222, 128, 0.45);
+  background: rgba(22, 101, 52, 0.28);
+}
+
+.relay-step-pill.step-active {
+  color: #261601;
+  background: var(--hogwarts-gold);
+  border-color: #fef08a;
+  font-weight: 900;
+}
+
+.relay-submitted-badge {
+  font-size: 11.5px;
+  color: var(--accent-cyan);
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.relay-form-card,
+.relay-waiting-seal-card {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 2px solid var(--border-gold);
+  border-radius: 18px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  box-shadow: var(--card-shadow);
+}
+
+.relay-waiting-seal-card {
+  align-items: center;
+  text-align: center;
+}
+
+.relay-prompt-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: linear-gradient(135deg, rgba(116, 0, 1, 0.45) 0%, rgba(25, 12, 42, 0.85) 100%);
+  border: 1px solid var(--hogwarts-gold);
+  border-radius: 14px;
+  padding: 8px 14px;
+  flex-shrink: 0;
+}
+
+.relay-showcase-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border: 2px solid var(--border-gold);
+  border-radius: 18px;
+  padding: 12px 14px;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.relay-showcase-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-card);
+  flex-shrink: 0;
+}
+
+.relay-timeline-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 4px;
+}
+
+.relay-entry-card {
+  background: rgba(10, 6, 18, 0.65);
+  border: 1px solid var(--border-card);
+  border-radius: 14px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.relay-entry-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.relay-entry-author {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--hogwarts-gold);
+}
+
+.relay-quote-bubble {
+  margin: 0;
+  padding: 10px 14px;
+  background: rgba(255, 216, 117, 0.08);
+  border-inline-start: 3px solid var(--hogwarts-gold);
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.relay-reaction-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.relay-reaction-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  min-block-size: 30px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  cursor: pointer;
+}
+
+.relay-reaction-btn.active {
+  background: rgba(212, 175, 55, 0.28);
+  border-color: var(--hogwarts-gold);
+  color: var(--hogwarts-gold);
+}
+
+.relay-showcase-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-card);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* Mode 2: Polyjuice Impostor Banner & Accessible Radio Suspect Cards */
+.impostor-role-banner {
+  border-radius: 14px;
+  padding: 8px 12px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-card);
+}
+
+.impostor-role-banner.is-impostor {
+  background: linear-gradient(135deg, rgba(136, 19, 55, 0.55) 0%, rgba(25, 10, 35, 0.88) 100%);
+  border-color: #fb7185;
+}
+
+.impostor-role-banner.is-wizard {
+  background: linear-gradient(135deg, rgba(20, 83, 45, 0.5) 0%, rgba(15, 23, 42, 0.88) 100%);
+  border-color: #4ade80;
+}
+
+.impostor-ink-roster {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.impostor-ink-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #e2e8f0;
+}
+
+.impostor-ink-chip.active-turn {
+  border-color: var(--hogwarts-gold);
+  background: rgba(212, 175, 55, 0.24);
+  color: #fff;
+  box-shadow: 0 0 10px rgba(255, 216, 117, 0.35);
+}
+
+.impostor-ink-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1.5px solid #fff;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.impostor-trial-panel {
+  background: var(--bg-card);
+  border: 2px solid var(--hogwarts-gold);
+  border-radius: 14px;
+  padding: 10px 12px;
+  flex-shrink: 0;
+}
+
+.impostor-vote-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+}
+
+.impostor-vote-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--hogwarts-gold);
+  margin-block-end: 8px;
+  padding: 0;
+}
+
+.impostor-suspect-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.impostor-suspect-option {
+  position: relative;
+}
+
+.impostor-suspect-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  min-height: 48px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1.5px solid rgba(255, 255, 255, 0.14);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.impostor-suspect-radio:checked + .impostor-suspect-card {
+  border-color: var(--hogwarts-gold);
+  background: rgba(212, 175, 55, 0.22);
+  box-shadow: 0 0 12px rgba(255, 216, 117, 0.3);
+}
+
+.impostor-suspect-radio:focus-visible + .impostor-suspect-card {
+  outline: 3px solid var(--accent-cyan);
+  outline-offset: 2px;
+}
+
+.impostor-suspect-radio:disabled + .impostor-suspect-card {
+  cursor: default;
+  opacity: 0.85;
+}
+

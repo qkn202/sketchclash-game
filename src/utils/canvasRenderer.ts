@@ -9,6 +9,11 @@ export function clearCanvas(ctx: CanvasRenderingContext2D, width = LOGICAL_WIDTH
   ctx.fillRect(0, 0, width, height);
 }
 
+function deterministicRand(x: number, y: number, idx: number, salt: number): number {
+  const n = Math.sin(x * 12.9898 + y * 78.233 + idx * 37.719 + salt * 93.137) * 43758.5453;
+  return n - Math.floor(n);
+}
+
 export function renderStroke(ctx: CanvasRenderingContext2D, stroke: DrawStroke): void {
   const { tool: sTool, color: sColor, size: sSize, points } = stroke;
   if (!points || points.length === 0) return;
@@ -43,52 +48,47 @@ export function renderStroke(ctx: CanvasRenderingContext2D, stroke: DrawStroke):
   };
 
   if (sTool === 'fire') {
-    // Layer 1: Incendio Flame aura
     ctx.shadowColor = '#ff4500';
     ctx.shadowBlur = sSize * 1.3;
     ctx.strokeStyle = '#ff7a00';
     ctx.lineWidth = sSize;
     drawPath();
 
-    // Layer 2: White-gold core
     ctx.shadowBlur = sSize * 0.4;
     ctx.shadowColor = '#ffd700';
     ctx.strokeStyle = '#fff7b2';
     ctx.lineWidth = Math.max(2, sSize * 0.45);
     drawPath();
 
-    // Fiery floating embers
-    for (const pt of points) {
-      if (Math.random() < 0.35) {
-        const angle = Math.random() * Math.PI * 2;
-        const dist = Math.random() * sSize * 0.8 + 2;
+    for (let i = 0; i < points.length; i++) {
+      const pt = points[i];
+      if (deterministicRand(pt.x, pt.y, i, 1) < 0.35) {
+        const angle = deterministicRand(pt.x, pt.y, i, 2) * Math.PI * 2;
+        const dist = deterministicRand(pt.x, pt.y, i, 3) * sSize * 0.8 + 2;
         const emberX = pt.x + Math.cos(angle) * dist;
-        const emberY = pt.y + Math.sin(angle) * dist - (Math.random() * 4 + 2);
-        ctx.fillStyle = Math.random() > 0.5 ? '#ffd700' : '#ff3b00';
+        const emberY = pt.y + Math.sin(angle) * dist - (deterministicRand(pt.x, pt.y, i, 4) * 4 + 2);
+        ctx.fillStyle = deterministicRand(pt.x, pt.y, i, 5) > 0.5 ? '#ffd700' : '#ff3b00';
         ctx.beginPath();
-        ctx.arc(emberX, emberY, Math.random() * 2 + 1, 0, Math.PI * 2);
+        ctx.arc(emberX, emberY, deterministicRand(pt.x, pt.y, i, 6) * 2 + 1, 0, Math.PI * 2);
         ctx.fill();
       }
     }
   } else if (sTool === 'ice') {
-    // Layer 1: Glisseo Frost aura
     ctx.shadowColor = '#38bdf8';
     ctx.shadowBlur = sSize * 1.2;
     ctx.strokeStyle = '#7dd3fc';
     ctx.lineWidth = sSize;
     drawPath();
 
-    // Layer 2: Crystalline core
     ctx.shadowBlur = sSize * 0.3;
     ctx.shadowColor = '#bae6fd';
     ctx.strokeStyle = '#f0f9ff';
     ctx.lineWidth = Math.max(2, sSize * 0.4);
     drawPath();
 
-    // Ice crystal diamonds
     for (let i = 0; i < points.length; i += 2) {
-      if (Math.random() < 0.3) {
-        const pt = points[i];
+      const pt = points[i];
+      if (deterministicRand(pt.x, pt.y, i, 7) < 0.3) {
         const crystalSize = sSize * 0.4;
         ctx.fillStyle = 'rgba(224, 242, 254, 0.9)';
         ctx.beginPath();
@@ -101,23 +101,21 @@ export function renderStroke(ctx: CanvasRenderingContext2D, stroke: DrawStroke):
       }
     }
   } else if (sTool === 'sparkle') {
-    // Layer 1: Lumos Starlight halo
     ctx.shadowColor = '#ffd875';
     ctx.shadowBlur = sSize * 1.5;
     ctx.strokeStyle = '#ffd875';
     ctx.lineWidth = sSize;
     drawPath();
 
-    // Layer 2: White core beam
     ctx.shadowBlur = sSize * 0.4;
     ctx.shadowColor = '#ffffff';
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = Math.max(1.5, sSize * 0.35);
     drawPath();
 
-    // 4-pointed sparkle stars
-    for (const pt of points) {
-      if (Math.random() < 0.28) {
+    for (let i = 0; i < points.length; i++) {
+      const pt = points[i];
+      if (deterministicRand(pt.x, pt.y, i, 8) < 0.28) {
         const starR = Math.max(3, sSize * 0.65);
         ctx.fillStyle = '#fffdf0';
         ctx.beginPath();
@@ -138,8 +136,39 @@ export function renderStroke(ctx: CanvasRenderingContext2D, stroke: DrawStroke):
   ctx.restore();
 }
 
-export function renderFill(ctx: CanvasRenderingContext2D, fill: DrawFill): void {
-  floodFillCanvas(ctx, fill.x, fill.y, fill.color);
+export function renderFill(ctx: CanvasRenderingContext2D, fill: DrawFill): boolean {
+  return floodFillCanvas(ctx, fill.x, fill.y, fill.color);
+}
+
+/**
+ * Render a snapshot data-URL onto canvas and resolve once drawn.
+ */
+export function renderSnapshotAsync(ctx: CanvasRenderingContext2D, snapshot: string): Promise<void> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      clearCanvas(ctx);
+      ctx.drawImage(img, 0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+      resolve();
+    };
+    img.onerror = () => resolve();
+    img.src = snapshot;
+  });
+}
+
+/**
+ * Apply a single DrawAction synchronously (or return Promise if it is a 'restore' snapshot).
+ */
+export async function applyDrawActionAsync(ctx: CanvasRenderingContext2D, action: DrawAction): Promise<void> {
+  if (action.type === 'clear') {
+    clearCanvas(ctx);
+  } else if (action.type === 'stroke' && action.stroke) {
+    renderStroke(ctx, action.stroke);
+  } else if (action.type === 'fill' && action.fill) {
+    renderFill(ctx, action.fill);
+  } else if (action.type === 'restore' && action.snapshot) {
+    await renderSnapshotAsync(ctx, action.snapshot);
+  }
 }
 
 export function renderDrawAction(ctx: CanvasRenderingContext2D, action: DrawAction): void {
@@ -149,5 +178,7 @@ export function renderDrawAction(ctx: CanvasRenderingContext2D, action: DrawActi
     renderStroke(ctx, action.stroke);
   } else if (action.type === 'fill' && action.fill) {
     renderFill(ctx, action.fill);
+  } else if (action.type === 'restore' && action.snapshot) {
+    void renderSnapshotAsync(ctx, action.snapshot);
   }
 }

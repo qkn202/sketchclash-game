@@ -34,14 +34,14 @@ export function floodFillCanvas(
   startX: number,
   startY: number,
   fillColorHex: string
-): void {
+): boolean {
   const width = ctx.canvas.width;
   const height = ctx.canvas.height;
 
   const x0 = Math.floor(startX);
   const y0 = Math.floor(startY);
 
-  if (x0 < 0 || x0 >= width || y0 < 0 || y0 >= height) return;
+  if (x0 < 0 || x0 >= width || y0 < 0 || y0 >= height) return false;
 
   const imageData = ctx.getImageData(0, 0, width, height);
   const data = imageData.data;
@@ -61,7 +61,7 @@ export function floodFillCanvas(
     Math.abs(targetB - fillB) < 6 &&
     Math.abs(targetA - fillA) < 6
   ) {
-    return;
+    return false;
   }
 
   // Scanline Flood Fill implementation
@@ -151,4 +151,5 @@ export function floodFillCanvas(
   }
 
   ctx.putImageData(imageData, 0, 0);
+  return true;
 }

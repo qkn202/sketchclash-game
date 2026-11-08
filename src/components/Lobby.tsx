@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useId } from 'react';
 import type { AvatarConfig, RoomConfig, GameMode } from '../types';
 import { AvatarPicker } from './AvatarPicker';
-import { Wand2, Play, Plus, LogIn, Bot, Volume2, VolumeX, Sparkles, Settings2, Scroll } from 'lucide-react';
+import { CustomRoomModal } from './CustomRoomModal';
+import { Wand2, Play, Plus, LogIn, Bot, Volume2, VolumeX, Sparkles, Scroll } from 'lucide-react';
 import { soundManager } from '../utils/audio';
 
 interface LobbyProps {
@@ -9,7 +10,30 @@ interface LobbyProps {
   onPlayerNameChange: (name: string) => void;
   avatar: AvatarConfig;
   onAvatarChange: (avatar: AvatarConfig) => void;
+  isMuted: boolean;
+  onToggleSound: () => void;
   onJoinRoom: (roomCode: string, config?: Partial<RoomConfig>, addBots?: boolean, isCreating?: boolean) => void;
+}
+
+function readInviteRoomFromUrl(): string {
+  if (typeof window === 'undefined') return '';
+  const params = new URLSearchParams(window.location.search);
+  return (params.get('room') || '').trim().toUpperCase();
+}
+
+/**
+ * Room-code generation (finding #3 mitigation). Codes are only used as the
+ * name of a Supabase BroadcastChannel / local BroadcastChannel — there is no
+ * server-side membership, so a short sequential space (HOGWARTS100–999, ~900
+ * codes) let a script enumerate live rooms and DoS them via room-full. A wide,
+ * non-sequential code makes brute-force discovery infeasible. The readable
+ * prefix is kept for UX; the body is 6 uppercase-alphanumerics (~20^6 ≈ 64M).
+ */
+function makeRoomCode(prefix: string): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1 (confusables)
+  let body = '';
+  for (let i = 0; i < 6; i++) body += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return `${prefix}${body}`;
 }
 
 export const Lobby: React.FC<LobbyProps> = ({
@@ -17,11 +41,14 @@ export const Lobby: React.FC<LobbyProps> = ({
   onPlayerNameChange,
   avatar,
   onAvatarChange,
+  isMuted,
+  onToggleSound,
   onJoinRoom,
 }) => {
-  const [roomCodeInput, setRoomCodeInput] = useState('');
+  const formId = useId();
+  const [invitedRoomCode] = useState<string>(readInviteRoomFromUrl);
+  const [roomCodeInput, setRoomCodeInput] = useState<string>(readInviteRoomFromUrl);
   const [showCustomModal, setShowCustomModal] = useState(false);
-  const [isMuted, setIsMuted] = useState(soundManager.isMuted());
 
   const [mode, setMode] = useState<GameMode>('classic');
   const [drawTime, setDrawTime] = useState<number>(60);
@@ -30,21 +57,20 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [language, setLanguage] = useState<'vi' | 'en'>('vi');
   const [customWordsText, setCustomWordsText] = useState('');
 
-  const toggleSound = () => {
-    const muted = soundManager.toggleMute();
-    setIsMuted(muted);
-  };
-
-
   const handleQuickPlay = () => {
     if (!playerName.trim()) return;
     soundManager.playClick();
-    const randomCode = 'HOGWARTS' + Math.floor(100 + Math.random() * 900);
-    onJoinRoom(randomCode, {
-      drawTime: 60,
-      totalRounds: 3,
-      language: 'vi',
-    }, true, true);
+    const randomCode = makeRoomCode('HOGWARTS');
+    onJoinRoom(
+      randomCode,
+      {
+        drawTime: 60,
+        totalRounds: 3,
+        language: 'vi',
+      },
+      true,
+      true
+    );
   };
 
   const handleJoinByCode = (e: React.FormEvent) => {
@@ -57,35 +83,45 @@ export const Lobby: React.FC<LobbyProps> = ({
   const handleCreateCustom = () => {
     if (!playerName.trim()) return;
     soundManager.playClick();
-    const randomCode = 'SPELL' + Math.floor(1000 + Math.random() * 9000);
+    const randomCode = makeRoomCode('SPELL');
     const customWords = customWordsText
       .split(',')
       .map((w) => w.trim())
       .filter((w) => w.length > 0);
 
-    onJoinRoom(randomCode, {
-      mode,
-      drawTime,
-      totalRounds,
-      maxPlayers,
-      language,
-      customWords,
-    }, false, true);
+    onJoinRoom(
+      randomCode,
+      {
+        mode,
+        drawTime,
+        totalRounds,
+        maxPlayers,
+        language,
+        customWords,
+      },
+      false,
+      true
+    );
   };
 
   const handlePlaySoloWithBots = () => {
     if (!playerName.trim()) return;
     soundManager.playClick();
-    const soloCode = 'MAGIC' + Math.floor(100 + Math.random() * 900);
-    onJoinRoom(soloCode, {
-      drawTime: 60,
-      totalRounds: 3,
-      language: 'vi',
-    }, true, true);
+    const soloCode = makeRoomCode('MAGIC');
+    onJoinRoom(
+      soloCode,
+      {
+        drawTime: 60,
+        totalRounds: 3,
+        language: 'vi',
+      },
+      true,
+      true
+    );
   };
 
   return (
-    <div
+    <main
       style={{
         maxWidth: '1050px',
         margin: '8px auto',
@@ -93,12 +129,14 @@ export const Lobby: React.FC<LobbyProps> = ({
         display: 'flex',
         flexDirection: 'column',
         gap: '16px',
+        width: '100%',
       }}
     >
       {/* Top Brand Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div
+            aria-hidden="true"
             className="animate-float"
             style={{
               fontSize: 'clamp(24px, 6vw, 36px)',
@@ -129,21 +167,63 @@ export const Lobby: React.FC<LobbyProps> = ({
               HOGWARTS SKETCH
             </h1>
             <p style={{ color: 'var(--text-muted)', fontSize: 'clamp(11px, 2.8vw, 13px)', marginTop: '2px' }} className="font-cinzel">
-              Đại Sảnh Đường — Đấu Trí Vẽ & Đoán Đồ Vật Ma Thuật
+              Đại Sảnh Đường — Đấu Trí Vẽ &amp; Đoán Đồ Vật Ma Thuật
             </p>
           </div>
         </div>
 
         <button
           type="button"
-          onClick={toggleSound}
+          onClick={onToggleSound}
+          aria-label={isMuted ? 'Mở bùa âm thanh' : 'Tắt bùa âm thanh'}
+          aria-pressed={!isMuted}
           className="btn-icon"
-          title={isMuted ? 'Mở Bùa Âm Thanh' : 'Tắt Bùa Âm Thanh'}
           style={{ padding: '10px' }}
         >
-          {isMuted ? <VolumeX size={20} color="var(--accent-red)" /> : <Volume2 size={20} color="var(--hogwarts-gold)" />}
+          {isMuted ? (
+            <VolumeX size={20} color="var(--accent-red)" aria-hidden="true" />
+          ) : (
+            <Volume2 size={20} color="var(--hogwarts-gold)" aria-hidden="true" />
+          )}
         </button>
-      </div>
+      </header>
+
+      {/* Invite Banner when ?room=CODE is present */}
+      {invitedRoomCode && (
+        <div
+          style={{
+            background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.22) 0%, rgba(116, 0, 1, 0.35) 100%)',
+            border: '2px solid var(--hogwarts-gold)',
+            borderRadius: '16px',
+            padding: '12px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '10px',
+            boxShadow: '0 0 20px rgba(255, 216, 117, 0.2)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
+            <Sparkles size={18} color="var(--hogwarts-gold)" aria-hidden="true" />
+            <span>
+              Thư cú mời bạn vào sảnh <strong style={{ color: 'var(--accent-cyan)' }}>{invitedRoomCode}</strong>!
+            </span>
+          </div>
+          <button
+            type="button"
+            disabled={!playerName.trim()}
+            onClick={() => {
+              soundManager.playClick();
+              onJoinRoom(invitedRoomCode, undefined, false, false);
+            }}
+            className="btn-gold"
+            style={{ padding: '8px 18px', fontSize: '14px' }}
+          >
+            <LogIn size={16} aria-hidden="true" /> Vào Sảnh {invitedRoomCode} Ngay
+          </button>
+        </div>
+      )}
 
       {/* Main Grid */}
       <div className="lobby-grid">
@@ -158,10 +238,16 @@ export const Lobby: React.FC<LobbyProps> = ({
               boxShadow: 'var(--card-shadow)',
             }}
           >
-            <label style={{ fontSize: '14px', fontWeight: 700, color: 'var(--hogwarts-gold)', display: 'block', marginBottom: '8px' }} className="font-cinzel">
+            <label
+              htmlFor={`${formId}-player-name`}
+              style={{ fontSize: '14px', fontWeight: 700, color: 'var(--hogwarts-gold)', display: 'block', marginBottom: '8px' }}
+              className="font-cinzel"
+            >
               Tên Phù Thủy Của Bạn:
             </label>
             <input
+              id={`${formId}-player-name`}
+              name="playerName"
               type="text"
               value={playerName}
               maxLength={20}
@@ -188,11 +274,10 @@ export const Lobby: React.FC<LobbyProps> = ({
               gap: '16px',
             }}
           >
-            <h3 style={{ fontSize: '20px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--hogwarts-gold)' }} className="font-cinzel">
-              <Wand2 size={20} color="var(--hogwarts-gold)" /> Chọn Sảnh Thi Đấu
-            </h3>
+            <h2 style={{ fontSize: '20px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--hogwarts-gold)' }} className="font-cinzel">
+              <Wand2 size={20} color="var(--hogwarts-gold)" aria-hidden="true" /> Chọn Sảnh Thi Đấu
+            </h2>
 
-            {/* Quick Play (Gryffindor theme) */}
             <button
               type="button"
               onClick={handleQuickPlay}
@@ -200,10 +285,9 @@ export const Lobby: React.FC<LobbyProps> = ({
               className="btn-primary"
               style={{ width: '100%', padding: '16px', fontSize: '17px' }}
             >
-              <Play size={20} /> Vào Phòng Thi Đấu (Quick Play)
+              <Play size={20} aria-hidden="true" /> Vào Phòng Thi Đấu (Quick Play)
             </button>
 
-            {/* Solo Practice with Hogwarts Bots */}
             <button
               type="button"
               onClick={handlePlaySoloWithBots}
@@ -211,19 +295,20 @@ export const Lobby: React.FC<LobbyProps> = ({
               className="btn-gryffindor"
               style={{ width: '100%', padding: '14px', fontSize: '16px' }}
             >
-              <Bot size={20} /> Luyện Tập Cùng Học Sinh Hogwarts (AI Bots)
+              <Bot size={20} aria-hidden="true" /> Luyện Tập Cùng Học Sinh Hogwarts (AI Bots)
             </button>
 
-
-            {/* Custom Room */}
             <button
               type="button"
-              onClick={() => { soundManager.playClick(); setShowCustomModal(true); }}
+              onClick={() => {
+                soundManager.playClick();
+                setShowCustomModal(true);
+              }}
               disabled={!playerName.trim()}
               className="btn-yellow"
               style={{ width: '100%', padding: '14px', fontSize: '16px' }}
             >
-              <Plus size={20} /> Tạo Phòng Phép Thuật Riêng
+              <Plus size={20} aria-hidden="true" /> Tạo Phòng Phép Thuật Riêng
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '4px 0' }}>
@@ -234,8 +319,17 @@ export const Lobby: React.FC<LobbyProps> = ({
 
             {/* Join by Code Form */}
             <form onSubmit={handleJoinByCode} style={{ display: 'flex', gap: '8px' }}>
+              <label htmlFor={`${formId}-room-code`} className="visually-hidden">
+                Mã phòng Hogwarts
+              </label>
               <input
+                id={`${formId}-room-code`}
+                name="roomCode"
                 type="text"
+                maxLength={16}
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
                 value={roomCodeInput}
                 onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
                 placeholder="NHẬP MÃ PHÒNG HOGWARTS..."
@@ -247,7 +341,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                 className="btn-primary"
                 style={{ padding: '0 18px', borderRadius: '12px' }}
               >
-                <LogIn size={18} /> Vào
+                <LogIn size={18} aria-hidden="true" /> Vào
               </button>
             </form>
           </div>
@@ -267,164 +361,34 @@ export const Lobby: React.FC<LobbyProps> = ({
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--hogwarts-gold)' }}>
-              <Scroll size={16} /> <strong>Học Viện Hogwarts:</strong> Tranh tài đoán các bảo bối huyền thoại: Quả Snitch Vàng, Mũ Phân Loại, Cú Hedwig, Áo Choàng Tàng Hình...
+              <Scroll size={16} aria-hidden="true" /> <strong>Học Viện Hogwarts:</strong> Tranh tài đoán các bảo bối huyền thoại: Quả Snitch Vàng, Mũ Phân Loại, Cú Hedwig, Áo Choàng Tàng Hình...
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#fff' }}>
-              <Sparkles size={16} color="var(--accent-cyan)" /> <strong>Học sinh AI thông thái:</strong> Cùng thi đấu với Hermione Granger, Ron Weasley, Draco Malfoy và Cụ Dumbledore!
+              <Sparkles size={16} color="var(--accent-cyan)" aria-hidden="true" /> <strong>Học sinh AI thông thái:</strong> Cùng thi đấu với Hermione Granger, Ron Weasley, Draco Malfoy và Cụ Dumbledore!
             </div>
           </div>
         </div>
       </div>
 
-      {/* Custom Room Modal */}
+      {/* Custom Room Modal via native <dialog> */}
       {showCustomModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(6, 4, 10, 0.88)',
-            backdropFilter: 'blur(8px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '20px',
-          }}
-        >
-          <div
-            className="animate-bounce-in"
-            style={{
-              background: 'var(--bg-card)',
-              border: '3px solid var(--hogwarts-gold)',
-              borderRadius: '24px',
-              padding: 'clamp(16px, 3vw, 24px)',
-              maxWidth: '480px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              width: '100%',
-              boxShadow: 'var(--card-shadow)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--hogwarts-gold)', marginBottom: '16px' }}>
-              <Settings2 size={24} />
-              <h2 style={{ fontSize: '22px', fontWeight: 800 }} className="font-cinzel">Tùy Chỉnh Phòng Phép Thuật</h2>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
-              <div>
-                <label style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                  Chế độ thi đấu ma thuật:
-                </label>
-                <select
-                  value={mode}
-                  onChange={(e) => setMode(e.target.value as GameMode)}
-                  style={{ width: '100%', fontWeight: 700 }}
-                >
-                  <option value="classic">🪄 Độc Hành Phép Thuật (1 người vẽ - Cả phòng đoán)</option>
-                  <option value="dual_coop">🤝 Song Kiếm Hợp Bích (Co-op 2 người cùng vẽ)</option>
-                  <option value="all_draw">🎭 Đại Hợp Xướng (Tất cả vẽ - 1 người đoán)</option>
-                  <option value="rush_draw">⚡ Đuổi Hình Bắt Chữ (Tất cả vừa vẽ vừa đoán đồng thời)</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                  Thời gian niệm phép mỗi vòng:
-                </label>
-                <select
-                  value={drawTime}
-                  onChange={(e) => setDrawTime(Number(e.target.value))}
-                  style={{ width: '100%' }}
-                >
-                  <option value={45}>45 giây</option>
-                  <option value={60}>60 giây (Mặc định)</option>
-                  <option value={80}>80 giây</option>
-                  <option value={90}>90 giây (Khuyên dùng cho Đuổi Hình Bắt Chữ)</option>
-                  <option value={100}>100 giây</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                  Số vòng thi đấu:
-                </label>
-                <select
-                  value={totalRounds}
-                  onChange={(e) => setTotalRounds(Number(e.target.value))}
-                  style={{ width: '100%' }}
-                >
-                  <option value={2}>2 vòng</option>
-                  <option value={3}>3 vòng (Mặc định)</option>
-                  <option value={5}>5 vòng</option>
-                  <option value={8}>8 vòng</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                  Số lượng phù thủy tối đa:
-                </label>
-                <select
-                  value={maxPlayers}
-                  onChange={(e) => setMaxPlayers(Number(e.target.value))}
-                  style={{ width: '100%', fontWeight: 700 }}
-                >
-                  <option value={8}>8 phù thủy</option>
-                  <option value={12}>12 phù thủy</option>
-                  <option value={16}>16 phù thủy</option>
-                  <option value={20}>20 phù thủy (Tối đa Hogwarts - Mặc định)</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                  Ngôn ngữ từ vựng ma thuật:
-                </label>
-                <select
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value as 'vi' | 'en')}
-                  style={{ width: '100%' }}
-                >
-                  <option value="vi">🇻🇳 Tiếng Việt (Pháp bảo & Sinh vật huyền bí)</option>
-                  <option value="en">🇬🇧 English (Spells & Hogwarts Lore)</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                  Thêm bảo bối/từ ngữ riêng (phân cách bằng dấu phẩy):
-                </label>
-                <input
-                  type="text"
-                  value={customWordsText}
-                  onChange={(e) => setCustomWordsText(e.target.value)}
-                  placeholder="Ví dụ: Bia bơ, Đũa cơm nguội, Thần chú Lumos..."
-                  style={{ width: '100%' }}
-                />
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                onClick={() => setShowCustomModal(false)}
-                className="btn-icon"
-                style={{ padding: '10px 18px' }}
-              >
-                Đóng
-              </button>
-              <button
-                type="button"
-                onClick={handleCreateCustom}
-                className="btn-primary"
-                style={{ padding: '10px 22px' }}
-              >
-                Mở Cổng Phòng Ngay
-              </button>
-            </div>
-          </div>
-        </div>
+        <CustomRoomModal
+          mode={mode}
+          drawTime={drawTime}
+          totalRounds={totalRounds}
+          maxPlayers={maxPlayers}
+          language={language}
+          customWordsText={customWordsText}
+          onModeChange={setMode}
+          onDrawTimeChange={setDrawTime}
+          onTotalRoundsChange={setTotalRounds}
+          onMaxPlayersChange={setMaxPlayers}
+          onLanguageChange={setLanguage}
+          onCustomWordsTextChange={setCustomWordsText}
+          onClose={() => setShowCustomModal(false)}
+          onConfirm={handleCreateCustom}
+        />
       )}
-    </div>
+    </main>
   );
 };
